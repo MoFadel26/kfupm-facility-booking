@@ -12,8 +12,6 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         builder.ToTable("Reservations");
         builder.HasKey(r => r.Id);
 
-        builder.Property(r => r.KfupmId).HasMaxLength(20);
-        builder.Property(r => r.FacilityId).HasMaxLength(20);
         builder.HasIndex(r => r.ReservationId).IsUnique();
         builder.Property(r => r.ReservationId).IsRequired().HasMaxLength(30);
 
@@ -23,12 +21,12 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
 
         builder.HasOne(r => r.Facility)
             .WithMany(f => f.Reservations)
-            .HasForeignKey(f => f.FacilityId)
+            .HasForeignKey(r => r.FacilityId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(r => r.User)
             .WithMany(u => u.Reservations)
-            .HasForeignKey(u => u.KfupmId)
+            .HasForeignKey(r => r.UserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -59,13 +59,13 @@ public class AppDbContext : DbContext
             endTime: reservationStart.AddHours(2),
             reason: "Project Meeting",
             targetParticipantCount: 4,
-            facilityId: "F-B22-124",
-            kfupmId: "202300001",
+            facilityId: facility.Id,
+            userId: user.Id,
             status: ReservationStatus.Confirmed);
 
         var participant = new EventParticipant(
-            kfupmId: "202300001",
-            reservationId: "RES-1001");
+            userId: user.Id,
+            reservationId: reservation.Id);
 
         context.AddRange(facility, user, reservation, participant);
     }

@@ -11,13 +11,11 @@ public class EventParticipantConfiguration : IEntityTypeConfiguration<EventParti
         builder.ToTable("EventParticipants");
         builder.HasKey(ep => ep.Id);
 
-        builder.Property(ep => ep.KfupmId).HasMaxLength(20);
-        builder.Property(ep => ep.ReservationId).HasMaxLength(30);
-        builder.HasIndex(ep => new { ep.KfupmId, ep.ReservationId }).IsUnique();
-            
+        builder.HasIndex(ep => new { ep.UserId, ep.ReservationId }).IsUnique();
+
         builder.HasOne(ep => ep.User)
             .WithMany(u => u.EventParticipants)
-            .HasForeignKey(ep => ep.KfupmId)
+            .HasForeignKey(ep => ep.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(ep => ep.Reservation)
