@@ -144,7 +144,28 @@ several minor edits belonged together (e.g. typos).
   `private set` style, and callers no longer need to remember to touch
   `UpdatedAt` on every mutation.
 
+## 9. Chore — move `DefaultConnection` to user-secrets
+
+- Commit: `8769bbb chore: move DefaultConnection to user-secrets`
+- Files:
+  - `ResourceManager.Api/ResourceManager.Api.csproj`
+  - `ResourceManager.Api/appsettings.json`
+- What: initialised a `UserSecretsId` on the project and stored the
+  Postgres connection string via `dotnet user-secrets set`. Removed
+  the `ConnectionStrings` section from `appsettings.json`.
+- Why: the connection string (including a real local username) was
+  committed to git. `WebApplicationBuilder` auto-loads user-secrets in
+  Development, so `GetConnectionString("DefaultConnection")` still
+  resolves without any code change. Other environments can provide the
+  value through environment variables or another config source.
+
 ## Items intentionally not changed
 
 - **Empty `ReservationService` / `IReservationService`.** The service
   exists as a placeholder; no logic to review yet.
+- **`Program.cs` still calls `EnsureCreatedAsync()`.** This must be
+  swapped for `Database.MigrateAsync()` before running EF Core
+  migrations; leaving `EnsureCreated` in place creates the schema
+  without a `__EFMigrationsHistory` row and the first `database
+  update` will fail. Not changed here because you may want to control
+  the switch alongside the first `dotnet ef migrations add`.
