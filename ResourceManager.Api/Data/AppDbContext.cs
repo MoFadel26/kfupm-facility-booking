@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ResourceManager.Api.Models;
+using ResourceManager.Api.Models.Enums;
 
 namespace ResourceManager.Api.Data;
 
@@ -37,37 +38,36 @@ public class AppDbContext : DbContext
 
     private static void SeedData(DbContext context)
     {
-        var facility = new Facility();
-        var fEntry = context.Add(facility);
-        fEntry.Property(f => f.FacilityId).CurrentValue = "F-B22-124";
-        fEntry.Property(f => f.Name).CurrentValue = "B22 - Room 124";
-        fEntry.Property(f => f.Type).CurrentValue = Models.Enums.FacilityType.Classroom;
-        fEntry.Property(f => f.AllowedGender).CurrentValue = Models.Enums.AllowedGender.Any;
-        fEntry.Property(f => f.AllowedRole).CurrentValue = Models.Enums.AllowedRole.Any;
+        var facility = new Facility(
+            facilityId: "F-B22-124",
+            name: "B22 - Room 124",
+            type: FacilityType.Classroom,
+            allowedGender: AllowedGender.Any,
+            allowedRole: AllowedRole.Any);
 
-        var user = new User();
-        var uEntry = context.Add(user);
-        uEntry.Property(u => u.KfupmId).CurrentValue = "202300001";
-        uEntry.Property(u => u.Name).CurrentValue = "Ahmed Al-Fadel";
-        uEntry.Property(u => u.Email).CurrentValue = "s202300001@kfupm.edu.sa";
-        uEntry.Property(u => u.Role).CurrentValue = Models.Enums.UserRole.Student;
-        uEntry.Property(u => u.Gender).CurrentValue = Models.Enums.Gender.Male;
+        var user = new User(
+            kfupmId: "202300001",
+            name: "Ahmed Al-Fadel",
+            email: "s202300001@kfupm.edu.sa",
+            role: UserRole.Student,
+            gender: Gender.Male);
 
-        var reservation = new Reservation();
-        var rEntry = context.Add(reservation);
-        rEntry.Property(r => r.ReservationId).CurrentValue = "RES-1001";
-        rEntry.Property(r => r.StartTime).CurrentValue = DateTimeOffset.UtcNow.AddDays(1);
-        rEntry.Property(r => r.EndTime).CurrentValue = DateTimeOffset.UtcNow.AddDays(1).AddHours(2);
-        rEntry.Property(r => r.Reason).CurrentValue = "Project Meeting";
-        rEntry.Property(r => r.Status).CurrentValue = Models.Enums.ReservationStatus.Confirmed;
-        rEntry.Property(r => r.TargetParticipantCount).CurrentValue = 4;
-        rEntry.Property(r => r.FacilityId).CurrentValue = "F-B22-124";
-        rEntry.Property(r => r.KfupmId).CurrentValue = "202300001";
+        var reservationStart = DateTimeOffset.UtcNow.AddDays(1);
+        var reservation = new Reservation(
+            reservationId: "RES-1001",
+            startTime: reservationStart,
+            endTime: reservationStart.AddHours(2),
+            reason: "Project Meeting",
+            targetParticipantCount: 4,
+            facilityId: "F-B22-124",
+            kfupmId: "202300001",
+            status: ReservationStatus.Confirmed);
 
-        var participant = new EventParticipant();
-        var pEntry = context.Add(participant);
-        pEntry.Property(p => p.KfupmId).CurrentValue = "202300001";
-        pEntry.Property(p => p.ReservationId).CurrentValue = "RES-1001";
+        var participant = new EventParticipant(
+            kfupmId: "202300001",
+            reservationId: "RES-1001");
+
+        context.AddRange(facility, user, reservation, participant);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -9,6 +9,22 @@ public class Facility : EntityBase
     public FacilityType Type { get; private set;}
     public AllowedGender AllowedGender { get; private set; } = AllowedGender.Any;
     public AllowedRole AllowedRole { get; private set; } = AllowedRole.Any;
-    
+
     public ICollection<Reservation> Reservations { get; private set;} = new List<Reservation>();
+
+    private Facility() { }
+
+    public Facility(
+        string facilityId,
+        string name,
+        FacilityType type,
+        AllowedGender allowedGender = AllowedGender.Any,
+        AllowedRole allowedRole = AllowedRole.Any)
+    {
+        FacilityId = facilityId;
+        Name = name;
+        Type = type;
+        AllowedGender = allowedGender;
+        AllowedRole = allowedRole;
+    }
 }
