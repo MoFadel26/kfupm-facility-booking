@@ -9,7 +9,7 @@ public class Reservation : EntityBase
     public DateTimeOffset EndTime { get; private set;}
     public string Reason { get; private set; } = string.Empty;
     public ReservationStatus Status { get; private set;} = ReservationStatus.Pending;
-    public int TargetPraticipantCount { get; private set;}
+    public int TargetParticipantCount { get; private set;}
     
     public string FacilityId { get; private set;} = string.Empty;
     public Facility Facility { get; private set; } = null!;

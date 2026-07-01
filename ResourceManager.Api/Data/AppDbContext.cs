@@ -60,7 +60,7 @@ public class AppDbContext : DbContext
         rEntry.Property(r => r.EndTime).CurrentValue = DateTimeOffset.UtcNow.AddDays(1).AddHours(2);
         rEntry.Property(r => r.Reason).CurrentValue = "Project Meeting";
         rEntry.Property(r => r.Status).CurrentValue = Models.Enums.ReservationStatus.Confirmed;
-        rEntry.Property(r => r.TargetPraticipantCount).CurrentValue = 4;
+        rEntry.Property(r => r.TargetParticipantCount).CurrentValue = 4;
         rEntry.Property(r => r.FacilityId).CurrentValue = "F-B22-124";
         rEntry.Property(r => r.KfupmId).CurrentValue = "202300001";
 
