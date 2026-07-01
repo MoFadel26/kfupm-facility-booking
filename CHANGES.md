@@ -70,23 +70,64 @@ several minor edits belonged together (e.g. typos).
   migration and no `EnsureCreated` call, the app would boot against an
   empty (or missing) database and the seed would never run.
 
+## 5. Refactor — foreign keys switched from string business ids to Guid PKs
+
+- Commit: `44964fa refactor: use Guid PKs as foreign keys instead of string business ids`
+- Files:
+  - `ResourceManager.Api/Models/Reservation.cs`
+  - `ResourceManager.Api/Models/EventParticipant.cs`
+  - `ResourceManager.Api/Data/Configurations/ReservationConfiguration.cs`
+  - `ResourceManager.Api/Data/Configurations/EventParticipantConfiguration.cs`
+  - `ResourceManager.Api/Data/AppDbContext.cs`
+- What:
+  - `Reservation.FacilityId` is now `Guid` and points at `Facility.Id`.
+  - `Reservation.KfupmId` is renamed to `UserId`, `Guid`, and points at
+    `User.Id`.
+  - `EventParticipant.KfupmId` is renamed to `UserId`, `Guid`, and points
+    at `User.Id`. `EventParticipant.ReservationId` is now `Guid` and
+    points at `Reservation.Id`.
+  - Constructors for `Reservation` and `EventParticipant` take the Guid
+    FKs instead of the previous string values.
+  - EF configurations drop the `HasMaxLength` calls for the FK columns
+    and wire `HasForeignKey` against the new Guid properties. The unique
+    composite index on `EventParticipant` is now
+    `(UserId, ReservationId)`.
+  - `AppDbContext.SeedData` passes `facility.Id`, `user.Id`, and
+    `reservation.Id` to the child entity constructors.
+- Why: FKs previously targeted the business identifier columns
+  (`Facility.FacilityId`, `User.KfupmId`, `Reservation.ReservationId`),
+  which are unique but not primary keys. Joins were string comparisons
+  and any business-id rename would have cascaded through every FK
+  column. Business identifiers are retained as unique columns for
+  external/human use.
+
+## 6. Feature — `AllowedRole` now covers every `UserRole`
+
+- Commit: `a699a33 feat: add Student and Admin to AllowedRole enum`
+- File: `ResourceManager.Api/Models/Enums/AllowedRole.cs`
+- What: added `Student` and `Admin` to `AllowedRole`.
+- Why: `UserRole` has five values; `AllowedRole` was missing `Student`
+  and `Admin`, so a `Facility` could not be gated to either group.
+  Existing `HasMaxLength(15)` on the string conversion already covers
+  the longest name.
+
+## 7. Chore — bump `Microsoft.OpenApi` past NU1903
+
+- Commit: `3a6c873 chore: pin Microsoft.OpenApi to 2.9.0 to clear NU1903`
+- File: `ResourceManager.Api/ResourceManager.Api.csproj`
+- What: added an explicit `PackageReference` for
+  `Microsoft.OpenApi 2.9.0` to override the transitive `2.0.0` pulled
+  by `Microsoft.AspNetCore.OpenApi 10.0.9`.
+- Why: `Microsoft.OpenApi 2.0.0` is affected by GHSA-v5pm-xwqc-g5wc.
+  Versions `2.0.1` and `2.1.0` are still flagged by `NU1903`; `2.9.0`
+  is the smallest tested version in the 2.x line that clears the
+  warning. `dotnet build` is now warning-free.
+
 ## Items intentionally not changed
 
-These were noted during the review but left as-is because they are design
-decisions rather than clear bugs. They can be revisited later:
-
-- **String business keys used as foreign keys.** `Reservation.FacilityId` and
-  `Reservation.KfupmId` (and the equivalents on `EventParticipant`) reference
-  the business identifiers (`FacilityId`, `KfupmId`) instead of the `Guid Id`
-  primary key inherited from `EntityBase`. This works because those columns
-  have unique indexes, but it is unconventional. Switching to `Guid` FKs
-  would be a larger schema change and was left for a follow-up decision.
-- **`AllowedRole` does not include `Student` or `Admin`.** `UserRole` defines
-  five roles but `AllowedRole` defines only four (no `Student`, no `Admin`).
-  This may be intentional (students are never gated by role, admins bypass
-  gating), but it should be confirmed before locking in.
-- **Empty `ReservationService` / `IReservationService`.** The service exists
-  as a placeholder; no logic to review yet.
-- **`Microsoft.OpenApi 2.0.0` vulnerability warning.** `dotnet build` emits
-  `NU1903` for `Microsoft.OpenApi 2.0.0` (pulled transitively). Worth
-  bumping to a patched version, but that is outside the scope of this pass.
+- **Empty `ReservationService` / `IReservationService`.** The service
+  exists as a placeholder; no logic to review yet.
+- **`EntityBase` has public setters on `Id`, `CreatedAt`, `UpdatedAt`.**
+  Inconsistent with the `private set` style used by the derived
+  entities. Also, `UpdatedAt` only refreshes when `Update()` is called
+  manually. Both worth revisiting when the domain grows.
