@@ -123,11 +123,28 @@ several minor edits belonged together (e.g. typos).
   is the smallest tested version in the 2.x line that clears the
   warning. `dotnet build` is now warning-free.
 
+## 8. Refactor — tighten `EntityBase` and auto-stamp timestamps
+
+- Commit: `99432ec refactor: tighten EntityBase and auto-stamp timestamps on SaveChanges`
+- Files:
+  - `ResourceManager.Api/Models/EntityBase.cs`
+  - `ResourceManager.Api/Data/AppDbContext.cs`
+- What:
+  - `Id` and `CreatedAt` are now `init`; they cannot be reassigned
+    after construction.
+  - `UpdatedAt` keeps a private setter and is refreshed through a new
+    `internal Touch(DateTimeOffset)` method that replaces the unused
+    public `Update()`.
+  - `AppDbContext` overrides `SaveChanges` and `SaveChangesAsync` to
+    walk `ChangeTracker.Entries<EntityBase>()` and stamp
+    `CreatedAt`/`UpdatedAt` on `Added` rows and `UpdatedAt` on
+    `Modified` rows. All entries in a save share the same `UtcNow`
+    instant.
+- Why: base-class setters no longer diverge from the derived entities'
+  `private set` style, and callers no longer need to remember to touch
+  `UpdatedAt` on every mutation.
+
 ## Items intentionally not changed
 
 - **Empty `ReservationService` / `IReservationService`.** The service
   exists as a placeholder; no logic to review yet.
-- **`EntityBase` has public setters on `Id`, `CreatedAt`, `UpdatedAt`.**
-  Inconsistent with the `private set` style used by the derived
-  entities. Also, `UpdatedAt` only refreshes when `Update()` is called
-  manually. Both worth revisiting when the domain grows.
