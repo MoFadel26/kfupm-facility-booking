@@ -6,5 +6,6 @@ public enum AllowedRole
     Faculty,
     Staff,
     ClubPresident,
-    Student
+    Student,
+    Admin
 }
