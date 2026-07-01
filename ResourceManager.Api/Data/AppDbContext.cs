@@ -75,4 +75,34 @@ public class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
+
+    public override int SaveChanges()
+    {
+        StampTimestamps();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        StampTimestamps();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void StampTimestamps()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var entry in ChangeTracker.Entries<EntityBase>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    entry.Property(nameof(EntityBase.CreatedAt)).CurrentValue = now;
+                    entry.Entity.Touch(now);
+                    break;
+                case EntityState.Modified:
+                    entry.Entity.Touch(now);
+                    break;
+            }
+        }
+    }
 }
