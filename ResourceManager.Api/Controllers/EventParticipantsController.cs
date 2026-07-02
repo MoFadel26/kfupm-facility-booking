@@ -19,12 +19,12 @@ public class EventParticipantsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<EventParticipantResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<EventParticipantResponse>>> GetAll([FromQuery] Guid? userId, [FromQuery] Guid? reservationId, CancellationToken ct)
+    public async Task<ActionResult<List<EventParticipantResponse>>> GetAll([FromQuery] string? userId, [FromQuery] string? reservationId, CancellationToken ct)
     {
         if (userId is not null)
-            return Ok(await _eventParticipantService.GetByUserIdAsync(userId.Value, ct));
+            return Ok(await _eventParticipantService.GetByUserIdAsync(userId, ct));
         if (reservationId is not null)
-            return Ok(await _eventParticipantService.GetByReservationIdAsync(reservationId.Value, ct));
+            return Ok(await _eventParticipantService.GetByReservationIdAsync(reservationId, ct));
         return Ok(await _eventParticipantService.GetAllAsync(ct));
     }
 

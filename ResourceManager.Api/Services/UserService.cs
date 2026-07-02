@@ -57,10 +57,10 @@ public class UserService : IUserService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
                    ?? throw new NotFoundException(nameof(User), id);
 
-        if (await _db.Reservations.AnyAsync(r => r.UserId == id, ct))
+        if (await _db.Reservations.AnyAsync(r => r.UserId == user.KfupmId, ct))
             throw new ConflictException("Cannot delete a user who has reservations. Delete their reservations first.");
 
-        if (await _db.EventParticipants.AnyAsync(ep => ep.UserId == id, ct))
+        if (await _db.EventParticipants.AnyAsync(ep => ep.UserId == user.KfupmId, ct))
             throw new ConflictException("Cannot delete a user who participates in events. Remove their participations first.");
 
         _db.Users.Remove(user);

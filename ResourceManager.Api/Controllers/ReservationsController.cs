@@ -19,12 +19,12 @@ public class ReservationsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<ReservationResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<ReservationResponse>>> GetAll([FromQuery] Guid? userId, [FromQuery] Guid? facilityId, CancellationToken ct)
+    public async Task<ActionResult<List<ReservationResponse>>> GetAll([FromQuery] string? userId, [FromQuery] string? facilityId, CancellationToken ct)
     {
         if (userId is not null)
-            return Ok(await _reservationService.GetByUserIdAsync(userId.Value, ct));
+            return Ok(await _reservationService.GetByUserIdAsync(userId, ct));
         if (facilityId is not null)
-            return Ok(await _reservationService.GetByFacilityIdAsync(facilityId.Value, ct));
+            return Ok(await _reservationService.GetByFacilityIdAsync(facilityId, ct));
         return Ok(await _reservationService.GetAllAsync(ct));
     }
 

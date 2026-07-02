@@ -36,9 +36,9 @@ public class EventParticipantService : IEventParticipantService
         return participant.ToResponse();
     }
 
-    public async Task<List<EventParticipantResponse>> GetByReservationIdAsync(Guid reservationId, CancellationToken ct = default)
+    public async Task<List<EventParticipantResponse>> GetByReservationIdAsync(string reservationId, CancellationToken ct = default)
     {
-        if (!await _db.Reservations.AnyAsync(r => r.Id == reservationId, ct))
+        if (!await _db.Reservations.AnyAsync(r => r.ReservationId == reservationId, ct))
             throw new NotFoundException(nameof(Reservation), reservationId);
 
         var participants = await _db.EventParticipants.AsNoTracking()
@@ -50,9 +50,9 @@ public class EventParticipantService : IEventParticipantService
         return participants.Select(ep => ep.ToResponse()).ToList();
     }
 
-    public async Task<List<EventParticipantResponse>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task<List<EventParticipantResponse>> GetByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        if (!await _db.Users.AnyAsync(u => u.Id == userId, ct))
+        if (!await _db.Users.AnyAsync(u => u.KfupmId == userId, ct))
             throw new NotFoundException(nameof(User), userId);
 
         var participants = await _db.EventParticipants.AsNoTracking()
@@ -66,12 +66,12 @@ public class EventParticipantService : IEventParticipantService
 
     public async Task<EventParticipantResponse> CreateAsync(CreateEventParticipantRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.UserId, ct)
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.KfupmId == request.UserId, ct)
                    ?? throw new NotFoundException(nameof(User), request.UserId);
 
         var reservation = await _db.Reservations.AsNoTracking()
                               .Include(r => r.Facility)
-                              .FirstOrDefaultAsync(r => r.Id == request.ReservationId, ct)
+                              .FirstOrDefaultAsync(r => r.ReservationId == request.ReservationId, ct)
                           ?? throw new NotFoundException(nameof(Reservation), request.ReservationId);
 
         if (reservation.Status == ReservationStatus.Cancelled)

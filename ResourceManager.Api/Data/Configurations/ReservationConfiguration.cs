@@ -20,15 +20,20 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         builder.Property(r => r.Reason).IsRequired().HasMaxLength(500);
 
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
-        
+
+        builder.Property(r => r.FacilityId).IsRequired().HasMaxLength(20);
+        builder.Property(r => r.UserId).IsRequired().HasMaxLength(20);
+
         builder.HasOne(r => r.Facility)
             .WithMany(f => f.Reservations)
             .HasForeignKey(r => r.FacilityId)
+            .HasPrincipalKey(f => f.FacilityId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(r => r.User)
             .WithMany(u => u.Reservations)
             .HasForeignKey(r => r.UserId)
+            .HasPrincipalKey(u => u.KfupmId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

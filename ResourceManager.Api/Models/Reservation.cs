@@ -11,10 +11,10 @@ public class Reservation : EntityBase
     public ReservationStatus Status { get; private set;} = ReservationStatus.Pending;
     public int TargetParticipantCount { get; private set;}
 
-    public Guid FacilityId { get; private set; }
+    public string FacilityId { get; private set; } = string.Empty;
     public Facility Facility { get; private set; } = null!;
 
-    public Guid UserId { get; private set; }
+    public string UserId { get; private set; } = string.Empty;
     public User User { get; private set; } = null!;
 
     public ICollection<EventParticipant> EventParticipants { get; private set;} = new List<EventParticipant>();
@@ -29,8 +29,8 @@ public class Reservation : EntityBase
         DateTimeOffset endTime,
         string reason,
         int targetParticipantCount,
-        Guid facilityId,
-        Guid userId,
+        string facilityId,
+        string userId,
         ReservationStatus status = ReservationStatus.Pending)
     {
         ReservationId = reservationId;

@@ -36,9 +36,9 @@ public class ReservationService : IReservationService
         return reservation.ToResponse();
     }
 
-    public async Task<List<ReservationResponse>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task<List<ReservationResponse>> GetByUserIdAsync(string userId, CancellationToken ct = default)
     {
-        if (!await _db.Users.AnyAsync(u => u.Id == userId, ct))
+        if (!await _db.Users.AnyAsync(u => u.KfupmId == userId, ct))
             throw new NotFoundException(nameof(User), userId);
 
         var reservations = await _db.Reservations.AsNoTracking()
@@ -50,9 +50,9 @@ public class ReservationService : IReservationService
         return reservations.Select(r => r.ToResponse()).ToList();
     }
 
-    public async Task<List<ReservationResponse>> GetByFacilityIdAsync(Guid facilityId, CancellationToken ct = default)
+    public async Task<List<ReservationResponse>> GetByFacilityIdAsync(string facilityId, CancellationToken ct = default)
     {
-        if (!await _db.Facilities.AnyAsync(f => f.Id == facilityId, ct))
+        if (!await _db.Facilities.AnyAsync(f => f.FacilityId == facilityId, ct))
             throw new NotFoundException(nameof(Facility), facilityId);
 
         var reservations = await _db.Reservations.AsNoTracking()
@@ -68,9 +68,9 @@ public class ReservationService : IReservationService
     {
         ValidateFields(request.StartTime, request.EndTime, request.Reason, request.TargetParticipantCount);
 
-        var facility = await _db.Facilities.AsNoTracking().FirstOrDefaultAsync(f => f.Id == request.FacilityId, ct)
+        var facility = await _db.Facilities.AsNoTracking().FirstOrDefaultAsync(f => f.FacilityId == request.FacilityId, ct)
                        ?? throw new NotFoundException(nameof(Facility), request.FacilityId);
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.UserId, ct)
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.KfupmId == request.UserId, ct)
                    ?? throw new NotFoundException(nameof(User), request.UserId);
 
         EnsureUserIsEligible(facility, user);
@@ -138,7 +138,7 @@ public class ReservationService : IReservationService
             throw new ConflictException($"Facility '{facility.Name}' is restricted to the {facility.AllowedRole} role.");
     }
 
-    private async Task EnsureSlotIsFreeAsync(Guid facilityId, DateTimeOffset startTime, DateTimeOffset endTime, Guid? excludeReservationId, CancellationToken ct)
+    private async Task EnsureSlotIsFreeAsync(string facilityId, DateTimeOffset startTime, DateTimeOffset endTime, Guid? excludeReservationId, CancellationToken ct)
     {
         var overlaps = await _db.Reservations.AnyAsync(r =>
             r.FacilityId == facilityId

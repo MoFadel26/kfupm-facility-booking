@@ -2,15 +2,15 @@ namespace ResourceManager.Api.Models;
 
 public class EventParticipant : EntityBase
 {
-    public Guid UserId { get; private set; }
+    public string UserId { get; private set; } = string.Empty;
     public User User { get; private set; } = null!;
 
-    public Guid ReservationId { get; private set; }
+    public string ReservationId { get; private set; } = string.Empty;
     public Reservation Reservation { get; private set; } = null!;
 
     private EventParticipant() { }
 
-    public EventParticipant(Guid userId, Guid reservationId)
+    public EventParticipant(string userId, string reservationId)
     {
         UserId = userId;
         ReservationId = reservationId;

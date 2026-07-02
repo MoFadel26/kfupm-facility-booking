@@ -57,7 +57,7 @@ public class FacilityService : IFacilityService
         var facility = await _db.Facilities.FirstOrDefaultAsync(f => f.Id == id, ct)
                        ?? throw new NotFoundException(nameof(Facility), id);
 
-        if (await _db.Reservations.AnyAsync(r => r.FacilityId == id, ct))
+        if (await _db.Reservations.AnyAsync(r => r.FacilityId == facility.FacilityId, ct))
             throw new ConflictException("Cannot delete a facility that has reservations. Delete its reservations first.");
 
         _db.Facilities.Remove(facility);

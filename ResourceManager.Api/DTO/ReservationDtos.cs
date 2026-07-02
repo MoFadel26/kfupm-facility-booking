@@ -16,9 +16,11 @@ public class CreateReservationRequest
     [Range(1, int.MaxValue)]
     public int TargetParticipantCount { get; set; }
 
-    public Guid FacilityId { get; set; }
+    [Required, MaxLength(20)]
+    public string FacilityId { get; set; } = string.Empty;
 
-    public Guid UserId { get; set; }
+    [Required, MaxLength(20)]
+    public string UserId { get; set; } = string.Empty;
 }
 
 public class UpdateReservationRequest
@@ -45,10 +47,9 @@ public class ReservationResponse
     public string Reason { get; set; } = string.Empty;
     public ReservationStatus Status { get; set; }
     public int TargetParticipantCount { get; set; }
-    public Guid FacilityId { get; set; }
-    public string FacilityRef { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
     public string FacilityName { get; set; } = string.Empty;
-    public Guid UserId { get; set; }
+    public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
 }
 
@@ -65,7 +66,6 @@ public static class ReservationMappingExtensions
         Status = reservation.Status,
         TargetParticipantCount = reservation.TargetParticipantCount,
         FacilityId = reservation.FacilityId,
-        FacilityRef = reservation.Facility.FacilityId,
         FacilityName = reservation.Facility.Name,
         UserId = reservation.UserId,
         UserName = reservation.User.Name
