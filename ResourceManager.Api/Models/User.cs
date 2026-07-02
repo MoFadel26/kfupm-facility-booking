@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using ResourceManager.Api.Models.Enums;
 
 namespace ResourceManager.Api.Models;
@@ -16,6 +17,15 @@ public class User : EntityBase
     private User() { }
 
     public User(string kfupmId, string name, string email, UserRole role, Gender gender)
+    {
+        KfupmId = kfupmId;
+        Name = name;
+        Email = email;
+        Role = role;
+        Gender = gender;
+    }
+
+    public void Update(string kfupmId, string name, string email, UserRole role, Gender gender)
     {
         KfupmId = kfupmId;
         Name = name;

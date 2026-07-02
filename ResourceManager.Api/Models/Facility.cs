@@ -27,4 +27,18 @@ public class Facility : EntityBase
         AllowedGender = allowedGender;
         AllowedRole = allowedRole;
     }
+
+    public void Update(
+        string facilityId,
+        string name,
+        FacilityType type,
+        AllowedGender allowedGender,
+        AllowedRole allowedRole)
+    {
+        FacilityId = facilityId;
+        Name = name;
+        Type = type;
+        AllowedGender = allowedGender;
+        AllowedRole = allowedRole;
+    }
 }

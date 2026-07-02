@@ -19,7 +19,9 @@ public class Reservation : EntityBase
 
     public ICollection<EventParticipant> EventParticipants { get; private set;} = new List<EventParticipant>();
 
-    private Reservation() { }
+    private Reservation()
+    {
+    }
 
     public Reservation(
         string reservationId,
@@ -38,6 +40,20 @@ public class Reservation : EntityBase
         TargetParticipantCount = targetParticipantCount;
         FacilityId = facilityId;
         UserId = userId;
+        Status = status;
+    }
+
+    public void Update(
+        DateTimeOffset startTime,
+        DateTimeOffset endTime,
+        string reason,
+        int targetParticipantCount,
+        ReservationStatus status)
+    {
+        StartTime = startTime;
+        EndTime = endTime;
+        Reason = reason;
+        TargetParticipantCount = targetParticipantCount;
         Status = status;
     }
 }

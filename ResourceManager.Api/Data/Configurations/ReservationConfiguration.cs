@@ -15,10 +15,12 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         builder.HasIndex(r => r.ReservationId).IsUnique();
         builder.Property(r => r.ReservationId).IsRequired().HasMaxLength(30);
 
+        builder.HasIndex(r => new { r.FacilityId, r.StartTime, r.EndTime}).IsUnique();
+
         builder.Property(r => r.Reason).IsRequired().HasMaxLength(500);
 
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
-
+        
         builder.HasOne(r => r.Facility)
             .WithMany(f => f.Reservations)
             .HasForeignKey(r => r.FacilityId)

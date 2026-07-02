@@ -1,12 +1,14 @@
-using ResourceManager.Api.Models;
+using ResourceManager.Api.DTO;
 
 namespace ResourceManager.Api.Services;
 
 public interface IReservationService
 {
-    // Get all reservationsAsync
-    // Get a reservation by Id Async
-    // Creat a reservationAsync
-    // Update a reservationAsync
-    // Delete a reservationAsync
+    Task<List<ReservationResponse>> GetAllAsync(CancellationToken ct = default);
+    Task<ReservationResponse> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<List<ReservationResponse>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
+    Task<List<ReservationResponse>> GetByFacilityIdAsync(Guid facilityId, CancellationToken ct = default);
+    Task<ReservationResponse> CreateAsync(CreateReservationRequest request, CancellationToken ct = default);
+    Task<ReservationResponse> UpdateAsync(Guid id, UpdateReservationRequest request, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

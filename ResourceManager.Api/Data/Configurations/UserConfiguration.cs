@@ -20,7 +20,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(x => x.Email).IsUnique();
         builder.Property(x => x.Email).IsRequired().HasMaxLength(150);
 
-        builder.Property(x => x.Role).HasConversion<string>();
-        builder.Property(x => x.Gender).HasConversion<string>();
+        builder.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
+        builder.Property(x => x.Gender).HasConversion<string>().HasMaxLength(10);
     }
 }
