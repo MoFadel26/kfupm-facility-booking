@@ -78,12 +78,16 @@ later phase has a safety net.
       Postgres behaviour Phase 4 depends on
 
 ### Ship
-- [ ] `ResourceManager.Api.Tests` project (xUnit)
-- [ ] `WebApplicationFactory` fixture with a real Postgres via Testcontainers,
-      overriding `ConnectionStrings:DefaultConnection`
-- [ ] Handle the startup path: `Program.cs` calls `MigrateAsync()` and
-      `AppDbContext.OnConfiguring` seeds unconditionally. Decide how tests get a
-      clean database per test (Respawn, or a fresh container per collection).
+- [x] `ResourceManager.Api.Tests` project (xUnit)
+- [x] `WebApplicationFactory` fixture against a real Postgres, overriding
+      `ConnectionStrings:DefaultConnection`. Not Testcontainers — no Docker daemon
+      on the dev machine — but a database created and dropped per run, aimed by
+      `TEST_POSTGRES_CONNECTION`. Swapping in Testcontainers later touches only
+      `ApiFixture`, no tests.
+- [x] Handled the startup path: seeding moved out of `AppDbContext.OnConfiguring`
+      into `DbSeeder`, called from `Program.cs` only under Development, so tests
+      and production both start empty. Tests run under a `Testing` environment and
+      truncate between cases.
 - [ ] Tests pinning behaviour that already exists:
       - overlapping reservation → 409
       - `EndTime <= StartTime` → 400
@@ -92,7 +96,12 @@ later phase has a safety net.
       - **update a reservation's time with no other reservations present** —
         this exercises `EnsureSlotIsFreeAsync`'s `r.Id != excludeReservationId`
         with a null parameter; confirm EF's null semantics do what you expect
-- [ ] GitHub Actions workflow: restore, build, test on push and PR
+      All of the above are covered, 17 tests. Verified non-vacuous by mutation:
+      disabling `ValidateFields` and `EnsureUserIsEligible` fails exactly the four
+      rule tests; disabling the overlap pre-check fails nothing, because the
+      database constraint carries it.
+- [x] GitHub Actions workflow: restore, build, test on push and PR, against a
+      `postgres:18` service container
 
 **Self-check:** Why can't you test the overlap rule against
 `UseInMemoryDatabase`? What is the difference between a test that asserts a 409
@@ -163,9 +172,10 @@ project.
       constraint is now the authority.
 - [x] Mapped `DbUpdateException` → `PostgresException` 23P01/23505 to 409 in
       `ApiExceptionHandler`
-- [ ] Promote the concurrency check into a committed test (verified by hand:
-      20 simultaneous creates for one slot → exactly one 201, one row, no 500s;
-      re-run with the service pre-check disabled to confirm the database path)
+- [x] Concurrency check committed. Note what it is worth: with the constraint
+      dropped it still passes, because the service pre-check usually wins the
+      timing. `The_overlap_rule_is_enforced_by_a_database_constraint` is the test
+      that actually fails when the constraint goes missing.
 - [ ] Consolidate validation. Shape rules currently live in DataAnnotations on
       the DTOs *and* in `ValidateFields` in the service. Annotations for shape,
       service for business rules, one place each.

@@ -72,6 +72,18 @@ npm run dev
 The overlap rule needs PostgreSQL's `btree_gist` extension. The migration creates
 it, which requires a role permitted to `CREATE EXTENSION`.
 
+## Tests
+
+Integration tests boot the real application and run against PostgreSQL — the
+overlap rule is a database constraint, so an in-memory provider would report a
+passing suite for a broken rule. Each run creates and drops its own database.
+
+```bash
+dotnet test
+# aim at a different server:
+TEST_POSTGRES_CONNECTION="Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres;" dotnet test
+```
+
 ## Layout
 
 ```
@@ -83,6 +95,7 @@ ResourceManager.Api/
   DTO/             request/response contracts and mapping
   Exceptions/      domain exceptions -> ProblemDetails
   Migrations/
+ResourceManager.Api.Tests/  integration tests against a real database
 frontend/          React client
 docs/              design notes and the ongoing work plan
 ```
