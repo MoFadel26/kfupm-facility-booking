@@ -52,10 +52,12 @@ npm run dev
    re-create. Status changes (confirm/cancel) go through PUT.
 5. **`ReservationId` is server-generated** (`RES-XXXXXXXX`); KFUPM ids and facility ids are
    caller-supplied real-world identifiers.
-6. **Overlap rule:** non-cancelled reservations on the same facility cannot intersect in time;
-   the DB's unique `(FacilityId, StartTime, EndTime)` index only catches exact duplicates, so
+6. **Overlap rule:** non-cancelled reservations on the same facility cannot intersect in time.
+   ~~The DB's unique `(FacilityId, StartTime, EndTime)` index only catches exact duplicates, so
    the service enforces true interval overlap. Small TOCTOU window between check and save is
-   accepted for this scale (no serializable transaction).
+   accepted for this scale.~~ **Superseded:** the unique index is gone (it also broke rebooking
+   a cancelled slot) and the rule is now a Postgres exclusion constraint,
+   `EX_Reservations_NoOverlap`. The TOCTOU window is closed.
 7. **Facility eligibility (gender/role)** is enforced for the reserving user and each
    participant at join time; `Any` always passes.
 8. **Audit columns (`CreatedAt`/`UpdatedAt`) are not exposed** in response DTOs, per the
@@ -73,8 +75,7 @@ npm run dev
   the plan files). Worth promoting into committed test suites.
 - **No pagination** — list endpoints return everything; fine at this scale, needed for real data.
 - **No auth/authorization** — anyone can call anything; the obvious next feature.
-- **Overlap check race** (see assumption 6) — a serializable transaction or exclusion
-  constraint (Postgres `tstzrange` + GiST) would make it airtight.
+- ~~**Overlap check race**~~ — fixed; see assumption 6.
 - **Reservation-status transitions are unconstrained** (e.g. Cancelled → Confirmed is allowed);
   add a transition rule if the domain needs it.
 - `EnsureUserIsEligible` compares `AllowedGender`/`AllowedRole` to `Gender`/`UserRole` by enum
