@@ -15,7 +15,9 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         builder.HasIndex(r => r.ReservationId).IsUnique();
         builder.Property(r => r.ReservationId).IsRequired().HasMaxLength(30);
 
-        builder.HasIndex(r => new { r.FacilityId, r.StartTime, r.EndTime}).IsUnique();
+        // Overlap is enforced by the "EX_Reservations_NoOverlap" exclusion constraint,
+        // added by raw SQL in the AddReservationOverlapExclusionConstraint migration.
+        // Its GiST index also serves the overlap lookup in ReservationService.
 
         builder.Property(r => r.Reason).IsRequired().HasMaxLength(500);
 
