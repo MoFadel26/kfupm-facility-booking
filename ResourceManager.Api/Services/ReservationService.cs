@@ -18,22 +18,19 @@ public class ReservationService : IReservationService
 
     public async Task<List<ReservationResponse>> GetAllAsync(CancellationToken ct = default)
     {
-        var reservations = await _db.Reservations.AsNoTracking()
-            .Include(r => r.Facility)
-            .Include(r => r.User)
+        return await _db.Reservations.AsNoTracking()
             .OrderBy(r => r.StartTime)
+            .Select(ReservationMappingExtensions.Projection)
             .ToListAsync(ct);
-        return reservations.Select(r => r.ToResponse()).ToList();
     }
 
     public async Task<ReservationResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var reservation = await _db.Reservations.AsNoTracking()
-            .Include(r => r.Facility)
-            .Include(r => r.User)
-            .FirstOrDefaultAsync(r => r.Id == id, ct)
+        return await _db.Reservations.AsNoTracking()
+            .Where(r => r.Id == id)
+            .Select(ReservationMappingExtensions.Projection)
+            .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException(nameof(Reservation), id);
-        return reservation.ToResponse();
     }
 
     public async Task<List<ReservationResponse>> GetByUserIdAsync(string userId, CancellationToken ct = default)
@@ -41,13 +38,11 @@ public class ReservationService : IReservationService
         if (!await _db.Users.AnyAsync(u => u.KfupmId == userId, ct))
             throw new NotFoundException(nameof(User), userId);
 
-        var reservations = await _db.Reservations.AsNoTracking()
-            .Include(r => r.Facility)
-            .Include(r => r.User)
+        return await _db.Reservations.AsNoTracking()
             .Where(r => r.UserId == userId)
             .OrderBy(r => r.StartTime)
+            .Select(ReservationMappingExtensions.Projection)
             .ToListAsync(ct);
-        return reservations.Select(r => r.ToResponse()).ToList();
     }
 
     public async Task<List<ReservationResponse>> GetByFacilityIdAsync(string facilityId, CancellationToken ct = default)
@@ -55,18 +50,16 @@ public class ReservationService : IReservationService
         if (!await _db.Facilities.AnyAsync(f => f.FacilityId == facilityId, ct))
             throw new NotFoundException(nameof(Facility), facilityId);
 
-        var reservations = await _db.Reservations.AsNoTracking()
-            .Include(r => r.Facility)
-            .Include(r => r.User)
+        return await _db.Reservations.AsNoTracking()
             .Where(r => r.FacilityId == facilityId)
             .OrderBy(r => r.StartTime)
+            .Select(ReservationMappingExtensions.Projection)
             .ToListAsync(ct);
-        return reservations.Select(r => r.ToResponse()).ToList();
     }
 
     public async Task<ReservationResponse> CreateAsync(CreateReservationRequest request, CancellationToken ct = default)
     {
-        ValidateFields(request.StartTime, request.EndTime, request.Reason, request.TargetParticipantCount);
+        EnsureTimeRangeIsValid(request.StartTime, request.EndTime);
 
         var facility = await _db.Facilities.AsNoTracking().FirstOrDefaultAsync(f => f.FacilityId == request.FacilityId, ct)
                        ?? throw new NotFoundException(nameof(Facility), request.FacilityId);
@@ -95,7 +88,7 @@ public class ReservationService : IReservationService
         var reservation = await _db.Reservations.FirstOrDefaultAsync(r => r.Id == id, ct)
                           ?? throw new NotFoundException(nameof(Reservation), id);
 
-        ValidateFields(request.StartTime, request.EndTime, request.Reason, request.TargetParticipantCount);
+        EnsureTimeRangeIsValid(request.StartTime, request.EndTime);
 
         // A cancelled reservation does not occupy the slot, so skip the overlap check for it.
         if (request.Status != ReservationStatus.Cancelled)
@@ -115,28 +108,50 @@ public class ReservationService : IReservationService
         await _db.SaveChangesAsync(ct);
     }
 
-    private static void ValidateFields(DateTimeOffset startTime, DateTimeOffset endTime, string reason, int targetParticipantCount)
+    /// <summary>
+    /// Only the rule the request DTOs cannot state. Reason and TargetParticipantCount are
+    /// covered by [Required] and [Range], which [ApiController] enforces before this runs;
+    /// repeating them here meant two places to change and two chances to disagree.
+    /// </summary>
+    private static void EnsureTimeRangeIsValid(DateTimeOffset startTime, DateTimeOffset endTime)
     {
         if (endTime <= startTime)
             throw new BadRequestException("EndTime must be after StartTime.");
-        if (string.IsNullOrWhiteSpace(reason))
-            throw new BadRequestException("Reason is required.");
-        if (targetParticipantCount < 1)
-            throw new BadRequestException("TargetParticipantCount must be at least 1.");
     }
 
     internal static void EnsureUserIsEligible(Facility facility, User user)
     {
-        var genderAllowed = facility.AllowedGender == AllowedGender.Any
-                            || facility.AllowedGender.ToString() == user.Gender.ToString();
-        if (!genderAllowed)
+        if (!IsGenderAllowed(facility.AllowedGender, user.Gender))
             throw new ConflictException($"Facility '{facility.Name}' is restricted to {facility.AllowedGender} users.");
 
-        var roleAllowed = facility.AllowedRole == AllowedRole.Any
-                          || facility.AllowedRole.ToString() == user.Role.ToString();
-        if (!roleAllowed)
+        if (!IsRoleAllowed(facility.AllowedRole, user.Role))
             throw new ConflictException($"Facility '{facility.Name}' is restricted to the {facility.AllowedRole} role.");
     }
+
+    // These used to compare the two enums by name. That worked only for as long as the
+    // name sets stayed aligned, and it failed silently — a renamed or added member would
+    // start letting the wrong people through with nothing to flag it. The mapping is now
+    // explicit, and an unmapped restriction throws rather than quietly allowing or denying.
+    private static bool IsGenderAllowed(AllowedGender allowed, Gender gender) => allowed switch
+    {
+        AllowedGender.Any => true,
+        AllowedGender.Male => gender is Gender.Male,
+        AllowedGender.Female => gender is Gender.Female,
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(allowed), allowed, "Unhandled facility gender restriction.")
+    };
+
+    private static bool IsRoleAllowed(AllowedRole allowed, UserRole role) => allowed switch
+    {
+        AllowedRole.Any => true,
+        AllowedRole.Faculty => role is UserRole.Faculty,
+        AllowedRole.Staff => role is UserRole.Staff,
+        AllowedRole.ClubPresident => role is UserRole.ClubPresident,
+        AllowedRole.Student => role is UserRole.Student,
+        AllowedRole.Admin => role is UserRole.Admin,
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(allowed), allowed, "Unhandled facility role restriction.")
+    };
 
     private async Task EnsureSlotIsFreeAsync(string facilityId, DateTimeOffset startTime, DateTimeOffset endTime, Guid? excludeReservationId, CancellationToken ct)
     {
