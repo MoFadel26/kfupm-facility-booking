@@ -45,8 +45,12 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // await db.Database.EnsureCreatedAsync();
     await db.Database.MigrateAsync();
+
+    // Sample data is for local development only. Tests need an empty database and
+    // production needs its own, so neither gets it.
+    if (app.Environment.IsDevelopment())
+        await DbSeeder.SeedAsync(db);
 }
 
 // Configure the HTTP request pipeline.
@@ -66,3 +70,8 @@ app.UseCors(FrontendCorsPolicy);
 app.MapControllers();
 
 app.Run();
+
+// Exposed so the integration tests can boot the real application through
+// WebApplicationFactory<Program>. Top-level statements generate an internal
+// Program class, which the factory cannot reach from another assembly.
+public partial class Program;
