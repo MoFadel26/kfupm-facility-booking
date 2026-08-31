@@ -25,9 +25,10 @@ public class User : EntityBase
         Gender = gender;
     }
 
-    public void Update(string kfupmId, string name, string email, UserRole role, Gender gender)
+    /// <summary>KfupmId is deliberately absent: it is the principal key reservations and
+    /// participants reference, and changing it would orphan them.</summary>
+    public void Update(string name, string email, UserRole role, Gender gender)
     {
-        KfupmId = kfupmId;
         Name = name;
         Email = email;
         Role = role;

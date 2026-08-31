@@ -28,14 +28,14 @@ public class Facility : EntityBase
         AllowedRole = allowedRole;
     }
 
+    /// <summary>FacilityId is deliberately absent: it is the principal key reservations
+    /// reference, and changing it would orphan them.</summary>
     public void Update(
-        string facilityId,
         string name,
         FacilityType type,
         AllowedGender allowedGender,
         AllowedRole allowedRole)
     {
-        FacilityId = facilityId;
         Name = name;
         Type = type;
         AllowedGender = allowedGender;

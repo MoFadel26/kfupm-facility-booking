@@ -17,20 +17,23 @@ public class FacilityService : IFacilityService
 
     public async Task<List<FacilityResponse>> GetAllAsync(CancellationToken ct = default)
     {
-        var facilities = await _db.Facilities.AsNoTracking().OrderBy(f => f.Name).ToListAsync(ct);
-        return facilities.Select(f => f.ToResponse()).ToList();
+        return await _db.Facilities.AsNoTracking()
+            .OrderBy(f => f.Name)
+            .Select(FacilityMappingExtensions.Projection)
+            .ToListAsync(ct);
     }
 
     public async Task<FacilityResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var facility = await _db.Facilities.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id, ct)
-                       ?? throw new NotFoundException(nameof(Facility), id);
-        return facility.ToResponse();
+        return await _db.Facilities.AsNoTracking()
+            .Where(f => f.Id == id)
+            .Select(FacilityMappingExtensions.Projection)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(Facility), id);
     }
 
     public async Task<FacilityResponse> CreateAsync(FacilityRequest request, CancellationToken ct = default)
     {
-        ValidateFields(request);
         await EnsureUniqueAsync(request.FacilityId, excludeId: null, ct);
 
         var facility = new Facility(request.FacilityId.Trim(), request.Name.Trim(), request.Type, request.AllowedGender, request.AllowedRole);
@@ -44,10 +47,14 @@ public class FacilityService : IFacilityService
         var facility = await _db.Facilities.FirstOrDefaultAsync(f => f.Id == id, ct)
                        ?? throw new NotFoundException(nameof(Facility), id);
 
-        ValidateFields(request);
+        // Reservations reference the facility id directly; changing it strands them.
+        if (request.FacilityId.Trim() != facility.FacilityId)
+            throw new ConflictException(
+                $"A facility's id cannot be changed (it is '{facility.FacilityId}'). Create a new facility instead.");
+
         await EnsureUniqueAsync(request.FacilityId, excludeId: id, ct);
 
-        facility.Update(request.FacilityId.Trim(), request.Name.Trim(), request.Type, request.AllowedGender, request.AllowedRole);
+        facility.Update(request.Name.Trim(), request.Type, request.AllowedGender, request.AllowedRole);
         await _db.SaveChangesAsync(ct);
         return facility.ToResponse();
     }
@@ -62,14 +69,6 @@ public class FacilityService : IFacilityService
 
         _db.Facilities.Remove(facility);
         await _db.SaveChangesAsync(ct);
-    }
-
-    private static void ValidateFields(FacilityRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.FacilityId))
-            throw new BadRequestException("FacilityId is required.");
-        if (string.IsNullOrWhiteSpace(request.Name))
-            throw new BadRequestException("Name is required.");
     }
 
     private async Task EnsureUniqueAsync(string facilityId, Guid? excludeId, CancellationToken ct)
