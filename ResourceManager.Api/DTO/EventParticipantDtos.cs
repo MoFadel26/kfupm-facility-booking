@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Linq.Expressions;
 using ResourceManager.Api.Models;
 
 namespace ResourceManager.Api.DTO;
@@ -23,8 +24,12 @@ public class EventParticipantResponse
 
 public static class EventParticipantMappingExtensions
 {
-    /// <summary>Expects <c>User</c> and <c>Reservation</c> navigations to be loaded.</summary>
-    public static EventParticipantResponse ToResponse(this EventParticipant participant) => new()
+    /// <summary>
+    /// An expression, not a method body, so EF translates it into the SELECT list. A list
+    /// query then reads exactly these columns instead of materialising whole entities and
+    /// their navigations only to copy a few fields out of them.
+    /// </summary>
+    public static readonly Expression<Func<EventParticipant, EventParticipantResponse>> Projection = participant => new EventParticipantResponse
     {
         Id = participant.Id,
         UserId = participant.UserId,
@@ -32,4 +37,9 @@ public static class EventParticipantMappingExtensions
         ReservationId = participant.ReservationId,
         ReservationReason = participant.Reservation.Reason
     };
+
+    private static readonly Func<EventParticipant, EventParticipantResponse> Map = Projection.Compile();
+
+    /// <summary>In-memory mapping for an entity already loaded. Expects <c>User</c> and <c>Reservation</c> to be loaded.</summary>
+    public static EventParticipantResponse ToResponse(this EventParticipant eventParticipant) => Map(eventParticipant);
 }

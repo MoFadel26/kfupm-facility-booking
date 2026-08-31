@@ -132,10 +132,9 @@ book a room as any user.
 - [ ] Replace `UpdateReservationRequest.Status` with transition endpoints —
       `POST /api/reservations/{id}/confirm` and `/cancel` — each with its own
       policy. As written, a client can self-confirm its own pending booking.
-- [ ] Audit `User.Update`: it reassigns `KfupmId`, the principal key that
-      `Reservation.UserId` and `EventParticipant.UserId` reference via
-      `HasPrincipalKey` with `DeleteBehavior.Restrict`. Write a test for the
-      rename, then decide whether to forbid it.
+- [x] Audited `User.Update`. A rename returned 500 from a foreign key violation.
+      `KfupmId` and `FacilityId` are now immutable — removed from the entities'
+      `Update` methods, and an attempted change is a 409.
 - [ ] Update the frontend for the new auth flow and the removed `UserId` field
 
 **Self-check:** Why is `[Authorize(Roles = "Admin")]` insufficient for "cancel
@@ -176,9 +175,10 @@ project.
       dropped it still passes, because the service pre-check usually wins the
       timing. `The_overlap_rule_is_enforced_by_a_database_constraint` is the test
       that actually fails when the constraint goes missing.
-- [ ] Consolidate validation. Shape rules currently live in DataAnnotations on
-      the DTOs *and* in `ValidateFields` in the service. Annotations for shape,
-      service for business rules, one place each.
+- [x] Consolidated validation. `ValidateFields` is gone from all three services;
+      annotations carry shape, and the services keep only rules annotations cannot
+      express (`EnsureTimeRangeIsValid`). Tests pin the annotation behaviour first,
+      so the deletion was provably behaviour-preserving.
 
 **Self-check:** Why doesn't wrapping the check and the insert in a single
 transaction fix the race at Read Committed? What does the database know that the
@@ -201,8 +201,11 @@ Second contract break. Do the frontend update in the same pass as Phase 3's.
       every row unbounded, and `GetAll` checks `userId` then `facilityId` in
       sequence, so passing both silently ignores the second.
 - [ ] A shared `PagedResult<T>` response shape, and the frontend updated to it
-- [ ] Push projection into the query — `ToResponse()` runs after `ToListAsync`,
-      so every list loads full entities plus two `Include`s before mapping
+- [x] Pushed projection into the query. Each DTO class exposes an
+      `Expression<Func<TEntity, TResponse>> Projection` that EF translates into the
+      SELECT list; `ToResponse` is its compiled form, so there is one mapping.
+      `GET /api/reservations` now issues a single query selecting eleven columns
+      across two joins, with no entities materialised.
 - [ ] Build the filtering and paging once from memory, then diff against the
       course code and note what you missed
 - [ ] Publish the OpenAPI document as a build artifact in CI

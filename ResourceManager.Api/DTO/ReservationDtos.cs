@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Linq.Expressions;
 using ResourceManager.Api.Models;
 using ResourceManager.Api.Models.Enums;
 
@@ -55,8 +56,12 @@ public class ReservationResponse
 
 public static class ReservationMappingExtensions
 {
-    /// <summary>Expects <c>Facility</c> and <c>User</c> navigations to be loaded.</summary>
-    public static ReservationResponse ToResponse(this Reservation reservation) => new()
+    /// <summary>
+    /// An expression, not a method body, so EF translates it into the SELECT list. A list
+    /// query then reads exactly these columns instead of materialising whole entities and
+    /// their navigations only to copy a few fields out of them.
+    /// </summary>
+    public static readonly Expression<Func<Reservation, ReservationResponse>> Projection = reservation => new ReservationResponse
     {
         Id = reservation.Id,
         ReservationId = reservation.ReservationId,
@@ -70,4 +75,9 @@ public static class ReservationMappingExtensions
         UserId = reservation.UserId,
         UserName = reservation.User.Name
     };
+
+    private static readonly Func<Reservation, ReservationResponse> Map = Projection.Compile();
+
+    /// <summary>In-memory mapping for an entity already loaded. Expects <c>Facility</c> and <c>User</c> to be loaded.</summary>
+    public static ReservationResponse ToResponse(this Reservation reservation) => Map(reservation);
 }

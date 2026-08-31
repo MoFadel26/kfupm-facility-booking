@@ -78,8 +78,7 @@ npm run dev
 - ~~**Overlap check race**~~ — fixed; see assumption 6.
 - **Reservation-status transitions are unconstrained** (e.g. Cancelled → Confirmed is allowed);
   add a transition rule if the domain needs it.
-- `EnsureUserIsEligible` compares `AllowedGender`/`AllowedRole` to `Gender`/`UserRole` by enum
-  name string — works because the name sets align, but a shared mapping would be more robust if
-  enums diverge.
+- ~~`EnsureUserIsEligible` compares enums by name string~~ — fixed; the members are mapped
+  explicitly and an unmapped restriction throws instead of silently allowing or denying.
 - The seed reservation's time window is relative to first-run time; it may appear as past/
   upcoming depending on when the DB was seeded.

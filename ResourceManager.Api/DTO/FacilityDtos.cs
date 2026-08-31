@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Linq.Expressions;
 using ResourceManager.Api.Models;
 using ResourceManager.Api.Models.Enums;
 
@@ -31,7 +32,12 @@ public class FacilityResponse
 
 public static class FacilityMappingExtensions
 {
-    public static FacilityResponse ToResponse(this Facility facility) => new()
+    /// <summary>
+    /// An expression, not a method body, so EF translates it into the SELECT list. A list
+    /// query then reads exactly these columns instead of materialising whole entities and
+    /// their navigations only to copy a few fields out of them.
+    /// </summary>
+    public static readonly Expression<Func<Facility, FacilityResponse>> Projection = facility => new FacilityResponse
     {
         Id = facility.Id,
         FacilityId = facility.FacilityId,
@@ -40,4 +46,9 @@ public static class FacilityMappingExtensions
         AllowedGender = facility.AllowedGender,
         AllowedRole = facility.AllowedRole
     };
+
+    private static readonly Func<Facility, FacilityResponse> Map = Projection.Compile();
+
+    /// <summary>In-memory mapping for an entity already loaded.</summary>
+    public static FacilityResponse ToResponse(this Facility facility) => Map(facility);
 }
