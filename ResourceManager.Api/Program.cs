@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -49,18 +50,45 @@ builder.Services.AddHttpLogging(options =>
     options.CombineLogs = true;
 });
 
+// The deployed frontend is not on localhost, and a wrong origin fails as a browser
+// error far from its cause, so this is configuration rather than a constant. Production
+// must say so explicitly: refusing to start is a better failure than every request from
+// the real frontend being blocked by a value nobody remembered to change.
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (allowedOrigins.Length == 0)
+{
+    if (builder.Environment.IsProduction())
+        throw new InvalidOperationException(
+            "Cors:AllowedOrigins is not configured. Set it to the origins the frontend is "
+            + "served from, for example Cors__AllowedOrigins__0=https://example.com");
+
+    allowedOrigins = ["http://localhost:5173"];
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy => policy
-        .WithOrigins("http://localhost:5173")
+        .WithOrigins(allowedOrigins)
         .AllowAnyHeader()
         .AllowAnyMethod());
 });
 
+// Liveness deliberately checks nothing: it answers "is this process running", and a
+// platform restarts the container when it fails. Readiness checks the database, because
+// an instance that cannot reach it should stop receiving traffic — not be killed.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
+
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+// Migrating on startup is convenient and fine for a single instance. Two instances
+// starting together will race, and a failed migration takes the app down with it rather
+// than failing a deploy step you can retry — so once this runs as more than one replica,
+// set Database:MigrateOnStartup to false and run `dotnet ef database update` from the
+// deployment pipeline instead.
+if (builder.Configuration.GetValue("Database:MigrateOnStartup", true))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 
@@ -90,6 +118,12 @@ app.UseExceptionHandler();
 app.UseCors(FrontendCorsPolicy);
 
 app.MapControllers();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 app.Run();
 

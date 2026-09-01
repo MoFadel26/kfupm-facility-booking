@@ -121,6 +121,38 @@ unknown id, `409` for a rule violation (overlapping slot, facility restriction,
 duplicate identifier, an illegal status transition, or an attempt to change a
 natural key).
 
+## Deployment configuration
+
+A `Dockerfile` is in `ResourceManager.Api/`. The app reads everything it needs from
+configuration, so nothing below is baked into the image.
+
+| Setting | Environment variable | Notes |
+| --- | --- | --- |
+| Database | `ConnectionStrings__DefaultConnection` | Required. User secrets are local-development only and do not ship. |
+| Allowed browser origins | `Cors__AllowedOrigins__0`, `__1`, … | Required in Production — the app refuses to start without it, rather than blocking every request from the real frontend. |
+| Migrate on startup | `Database__MigrateOnStartup` | Defaults to true. |
+| Environment | `ASPNETCORE_ENVIRONMENT` | `Production` disables the seed data and the Scalar docs UI, and switches logs to JSON. |
+
+Health endpoints, for a container platform's probes:
+
+- `GET /health/live` — is the process running. Checks no dependencies, so a database
+  outage does not cause a restart loop.
+- `GET /health/ready` — can it serve traffic. Checks the database, and returns `503`
+  when it is unreachable so the instance stops receiving requests.
+
+The database needs the `btree_gist` extension for the overlap rule. The migration
+creates it, which requires a role permitted to `CREATE EXTENSION`.
+
+**Migrations run on startup by default.** That is fine for a single instance. Running
+more than one replica means two of them can migrate at once, and a failed migration
+takes the app down instead of failing a deploy step you can retry — so set
+`Database__MigrateOnStartup=false` and run `dotnet ef database update` from the
+pipeline instead.
+
+**Do not expose this publicly yet.** There is no authentication: anyone who reaches
+the URL can create, cancel or delete any reservation, and can name any user as the
+owner of a booking.
+
 ## Logs
 
 One entry per request (method, path, query, status, duration) plus a line for each

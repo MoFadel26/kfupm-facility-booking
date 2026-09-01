@@ -226,12 +226,17 @@ evaluation? What does `AsNoTracking` change about a query that projects to a DTO
 
 ## Phase 6 — Ship
 
-- [ ] Configuration and secrets for the deployed environment — the connection
-      string is currently user-secrets only
-- [ ] Stop seeding in production: `AppDbContext.OnConfiguring` seeds
-      unconditionally, and `Program.cs` migrates on every startup. Decide what
-      the deploy story is for both.
-- [ ] Health check endpoint
+- [x] Configuration for the deployed environment: connection string, CORS origins
+      and the migration switch all come from configuration, documented in the
+      README as environment variables. Choosing a secret store is a hosting
+      decision, still open.
+- [x] Seeding is Development-only. Migration on startup is now a configuration
+      switch (`Database:MigrateOnStartup`, default true) rather than unconditional;
+      the README says when to turn it off and what to do instead.
+- [x] Health checks, split by what a platform does with each: `/health/live`
+      checks nothing so a database blip cannot cause a restart loop, `/health/ready`
+      checks the database and returns 503 when it is unreachable. Verified against
+      an unreachable database, not just a working one.
 - [x] Structured logging with a correlation id. `HttpLogging` emits one entry per
       request (method, path, query, status, duration — no headers or bodies, which
       will carry credentials once auth lands), registered *outside* the exception
@@ -242,8 +247,9 @@ evaluation? What does `AsNoTracking` change about a query that projects to a DTO
       JSON outside Development. Unhandled exceptions were already logged by the
       framework — the gap was correlation, not silence.
 - [ ] Deploy the API
-- [ ] Point the frontend at the deployed URL; update the CORS origin, which is
-      hardcoded to `http://localhost:5173`
+- [x] CORS origins come from configuration, defaulting to localhost outside
+      Production and refusing to start in Production when unset. Pointing the
+      frontend at a deployed URL is left for the deploy itself.
 - [ ] README: what decision the API supports, what a wrong result costs
 
 **Self-check:** What in your app would break first under ten concurrent users?
