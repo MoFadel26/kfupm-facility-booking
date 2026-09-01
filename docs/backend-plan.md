@@ -232,8 +232,15 @@ evaluation? What does `AsNoTracking` change about a query that projects to a DTO
       unconditionally, and `Program.cs` migrates on every startup. Decide what
       the deploy story is for both.
 - [ ] Health check endpoint
-- [ ] Structured logging with a correlation id, and log unhandled exceptions —
-      `ApiExceptionHandler` currently writes the response but logs nothing
+- [x] Structured logging with a correlation id. `HttpLogging` emits one entry per
+      request (method, path, query, status, duration — no headers or bodies, which
+      will carry credentials once auth lands), registered *outside* the exception
+      handler, since inside it every error logs as a 200. `ApiExceptionHandler`
+      logs each rejection with its reason. Error responses carry a `traceId` that
+      matches the log entry, which comes from writing through
+      `IProblemDetailsService` rather than serialising by hand. Console logs are
+      JSON outside Development. Unhandled exceptions were already logged by the
+      framework — the gap was correlation, not silence.
 - [ ] Deploy the API
 - [ ] Point the frontend at the deployed URL; update the CORS origin, which is
       hardcoded to `http://localhost:5173`

@@ -121,6 +121,13 @@ unknown id, `409` for a rule violation (overlapping slot, facility restriction,
 duplicate identifier, an illegal status transition, or an attempt to change a
 natural key).
 
+## Logs
+
+One entry per request (method, path, query, status, duration) plus a line for each
+rejection and its reason. Error responses carry a `traceId` matching the log entry,
+so a reported error can be traced to the request that caused it. Console output is
+JSON outside Development.
+
 ## Status
 
 Working end to end, not production-ready. See

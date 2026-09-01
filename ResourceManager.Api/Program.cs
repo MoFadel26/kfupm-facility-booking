@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using ResourceManager.Api.Data;
@@ -30,7 +31,23 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 });
 
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+
+// ApiExceptionHandler writes through this rather than serialising a ProblemDetails
+// itself, which is what gets a traceId onto domain errors. MVC's automatic 400 for a
+// failed annotation already carries one from its own factory.
 builder.Services.AddProblemDetails();
+
+// One log entry per request. Headers and bodies are deliberately excluded: they carry
+// user data now and credentials once authentication lands.
+builder.Services.AddHttpLogging(options =>
+{
+    options.LoggingFields = HttpLoggingFields.RequestMethod
+                            | HttpLoggingFields.RequestPath
+                            | HttpLoggingFields.RequestQuery
+                            | HttpLoggingFields.ResponseStatusCode
+                            | HttpLoggingFields.Duration;
+    options.CombineLogs = true;
+});
 
 builder.Services.AddCors(options =>
 {
@@ -63,6 +80,11 @@ else
 {
     app.UseHttpsRedirection();
 }
+
+// Outside the exception handler on purpose. Inside it, an exception unwinds past this
+// middleware before the handler has written the real status, and every error gets logged
+// as a 200.
+app.UseHttpLogging();
 
 app.UseExceptionHandler();
 app.UseCors(FrontendCorsPolicy);
