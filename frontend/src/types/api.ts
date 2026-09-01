@@ -19,6 +19,23 @@ export type FacilityType = (typeof FACILITY_TYPES)[number]
 export const RESERVATION_STATUSES = ['Pending', 'Confirmed', 'Cancelled'] as const
 export type ReservationStatus = (typeof RESERVATION_STATUSES)[number]
 
+/**
+ * A reservation only moves forward: Pending -> Confirmed -> Cancelled. Cancelling
+ * releases the slot, so a cancelled reservation is final — reviving it would hand the
+ * same facility to two bookings. The API rejects anything else with a 409; this keeps
+ * the UI from offering a move that is guaranteed to fail.
+ */
+export const allowedStatusTransitions = (current: ReservationStatus): ReservationStatus[] => {
+  switch (current) {
+    case 'Pending':
+      return ['Pending', 'Confirmed', 'Cancelled']
+    case 'Confirmed':
+      return ['Confirmed', 'Cancelled']
+    case 'Cancelled':
+      return ['Cancelled']
+  }
+}
+
 // ---------- Users ----------
 
 export interface UserRequest {

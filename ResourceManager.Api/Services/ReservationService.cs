@@ -89,6 +89,7 @@ public class ReservationService : IReservationService
                           ?? throw new NotFoundException(nameof(Reservation), id);
 
         EnsureTimeRangeIsValid(request.StartTime, request.EndTime);
+        EnsureTransitionIsAllowed(reservation.Status, request.Status);
 
         // A cancelled reservation does not occupy the slot, so skip the overlap check for it.
         if (request.Status != ReservationStatus.Cancelled)
@@ -106,6 +107,32 @@ public class ReservationService : IReservationService
 
         _db.Reservations.Remove(reservation);
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// A reservation moves forward only: Pending -> Confirmed -> Cancelled, and staying put
+    /// is always fine. Cancelling releases the slot for someone else, so reviving a
+    /// cancelled reservation would hand out a facility twice; the overlap constraint
+    /// catches that only when the slot has already been retaken, which makes the outcome
+    /// depend on whether anyone happened to rebook. Rejecting the move itself does not.
+    /// </summary>
+    private static void EnsureTransitionIsAllowed(ReservationStatus current, ReservationStatus requested)
+    {
+        if (current == requested)
+            return;
+
+        var allowed = current switch
+        {
+            ReservationStatus.Pending => requested is ReservationStatus.Confirmed or ReservationStatus.Cancelled,
+            ReservationStatus.Confirmed => requested is ReservationStatus.Cancelled,
+            ReservationStatus.Cancelled => false,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(current), current, "Unhandled reservation status.")
+        };
+
+        if (!allowed)
+            throw new ConflictException(
+                $"A {current} reservation cannot become {requested}.");
     }
 
     /// <summary>

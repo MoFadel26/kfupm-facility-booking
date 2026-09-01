@@ -132,6 +132,10 @@ book a room as any user.
 - [ ] Replace `UpdateReservationRequest.Status` with transition endpoints —
       `POST /api/reservations/{id}/confirm` and `/cancel` — each with its own
       policy. As written, a client can self-confirm its own pending booking.
+      Half done ahead of auth: *which* transitions are legal is now enforced
+      (`EnsureTransitionIsAllowed` — forward only, cancellation final), and the
+      UI offers only legal moves. Still open is *who* may make them, which is
+      what the endpoints and policies add.
 - [x] Audited `User.Update`. A rename returned 500 from a foreign key violation.
       `KfupmId` and `FacilityId` are now immutable — removed from the entities'
       `Update` methods, and an attempted change is a 409.

@@ -43,7 +43,7 @@ import { listFacilities } from '@/api/facilities'
 import { listUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
 import { formatRange, fromInputValue, toInputValue } from '@/lib/datetime'
-import { RESERVATION_STATUSES } from '@/types/api'
+import { allowedStatusTransitions } from '@/types/api'
 import type {
   FacilityResponse,
   ReservationResponse,
@@ -418,7 +418,7 @@ export function ReservationsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {RESERVATION_STATUSES.map((status) => (
+                      {allowedStatusTransitions(editing.status).map((status) => (
                         <SelectItem key={status} value={status}>
                           {status}
                         </SelectItem>
