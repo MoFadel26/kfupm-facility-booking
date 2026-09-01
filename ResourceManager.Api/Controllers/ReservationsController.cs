@@ -15,18 +15,13 @@ public class ReservationsController : ControllerBase
         _reservationService = reservationService;
     }
 
-    /// <summary>Lists reservations, optionally filtered by user or facility.</summary>
+    /// <summary>Lists reservations, earliest slot first, optionally filtered by user and facility.</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<ReservationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedResult<ReservationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<ReservationResponse>>> GetAll([FromQuery] string? userId, [FromQuery] string? facilityId, CancellationToken ct)
-    {
-        if (userId is not null)
-            return Ok(await _reservationService.GetByUserIdAsync(userId, ct));
-        if (facilityId is not null)
-            return Ok(await _reservationService.GetByFacilityIdAsync(facilityId, ct));
-        return Ok(await _reservationService.GetAllAsync(ct));
-    }
+    public async Task<ActionResult<PagedResult<ReservationResponse>>> GetAll([FromQuery] ReservationQuery query, CancellationToken ct)
+        => Ok(await _reservationService.GetAllAsync(query, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ReservationResponse), StatusCodes.Status200OK)]

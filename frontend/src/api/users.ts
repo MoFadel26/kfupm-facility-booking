@@ -1,7 +1,12 @@
 import { api } from './client'
-import type { UserRequest, UserResponse } from '@/types/api'
+import { fetchAllPages, pageQuery, withQuery } from './paging'
+import type { PageParams, PagedResult, UserRequest, UserResponse } from '@/types/api'
 
-export const listUsers = () => api.get<UserResponse[]>('/api/users')
+export const listUsers = (params?: PageParams) =>
+  api.get<PagedResult<UserResponse>>(withQuery('/api/users', pageQuery(params)))
+
+/** Every user, for select options. */
+export const listAllUsers = () => fetchAllPages(listUsers)
 export const getUser = (id: string) => api.get<UserResponse>(`/api/users/${id}`)
 export const createUser = (request: UserRequest) => api.post<UserResponse>('/api/users', request)
 export const updateUser = (id: string, request: UserRequest) =>

@@ -15,12 +15,13 @@ public class FacilityService : IFacilityService
         _db = db;
     }
 
-    public async Task<List<FacilityResponse>> GetAllAsync(CancellationToken ct = default)
+    public async Task<PagedResult<FacilityResponse>> GetAllAsync(PageQuery query, CancellationToken ct = default)
     {
         return await _db.Facilities.AsNoTracking()
             .OrderBy(f => f.Name)
+            .ThenBy(f => f.Id)
             .Select(FacilityMappingExtensions.Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(query, ct);
     }
 
     public async Task<FacilityResponse> GetByIdAsync(Guid id, CancellationToken ct = default)

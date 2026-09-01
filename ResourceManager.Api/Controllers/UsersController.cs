@@ -16,9 +16,10 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(List<UserResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<UserResponse>>> GetAll(CancellationToken ct)
-        => Ok(await _userService.GetAllAsync(ct));
+    [ProducesResponseType(typeof(PagedResult<UserResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PagedResult<UserResponse>>> GetAll([FromQuery] PageQuery query, CancellationToken ct)
+        => Ok(await _userService.GetAllAsync(query, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]

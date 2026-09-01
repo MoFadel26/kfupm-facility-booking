@@ -15,12 +15,13 @@ public class UserService : IUserService
         _db = db;
     }
 
-    public async Task<List<UserResponse>> GetAllAsync(CancellationToken ct = default)
+    public async Task<PagedResult<UserResponse>> GetAllAsync(PageQuery query, CancellationToken ct = default)
     {
         return await _db.Users.AsNoTracking()
             .OrderBy(u => u.Name)
+            .ThenBy(u => u.Id)
             .Select(UserMappingExtensions.Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(query, ct);
     }
 
     public async Task<UserResponse> GetByIdAsync(Guid id, CancellationToken ct = default)

@@ -97,4 +97,8 @@ public abstract class ApiTestBase : IAsyncLifetime
 
     protected static async Task<ReservationResponse> ReadReservationAsync(HttpResponseMessage response)
         => (await response.Content.ReadFromJsonAsync<ReservationResponse>(ApiFixture.Json))!;
+
+    /// <summary>Every list endpoint returns a page, never a bare array.</summary>
+    protected async Task<PagedResult<T>> GetPageAsync<T>(string url)
+        => (await Client.GetFromJsonAsync<PagedResult<T>>(url, ApiFixture.Json))!;
 }

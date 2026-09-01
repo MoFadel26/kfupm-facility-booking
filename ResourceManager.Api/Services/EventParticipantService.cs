@@ -16,12 +16,27 @@ public class EventParticipantService : IEventParticipantService
         _db = db;
     }
 
-    public async Task<List<EventParticipantResponse>> GetAllAsync(CancellationToken ct = default)
+    public async Task<PagedResult<EventParticipantResponse>> GetAllAsync(EventParticipantQuery query, CancellationToken ct = default)
     {
-        return await _db.EventParticipants.AsNoTracking()
+        if (query.UserId is not null && !await _db.Users.AnyAsync(u => u.KfupmId == query.UserId, ct))
+            throw new NotFoundException(nameof(User), query.UserId);
+
+        if (query.ReservationId is not null && !await _db.Reservations.AnyAsync(r => r.ReservationId == query.ReservationId, ct))
+            throw new NotFoundException(nameof(Reservation), query.ReservationId);
+
+        var participants = _db.EventParticipants.AsNoTracking();
+
+        if (query.UserId is not null)
+            participants = participants.Where(ep => ep.UserId == query.UserId);
+
+        if (query.ReservationId is not null)
+            participants = participants.Where(ep => ep.ReservationId == query.ReservationId);
+
+        return await participants
             .OrderBy(ep => ep.CreatedAt)
+            .ThenBy(ep => ep.Id)
             .Select(EventParticipantMappingExtensions.Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(query, ct);
     }
 
     public async Task<EventParticipantResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -31,30 +46,6 @@ public class EventParticipantService : IEventParticipantService
             .Select(EventParticipantMappingExtensions.Projection)
             .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException(nameof(EventParticipant), id);
-    }
-
-    public async Task<List<EventParticipantResponse>> GetByReservationIdAsync(string reservationId, CancellationToken ct = default)
-    {
-        if (!await _db.Reservations.AnyAsync(r => r.ReservationId == reservationId, ct))
-            throw new NotFoundException(nameof(Reservation), reservationId);
-
-        return await _db.EventParticipants.AsNoTracking()
-            .Where(ep => ep.ReservationId == reservationId)
-            .OrderBy(ep => ep.CreatedAt)
-            .Select(EventParticipantMappingExtensions.Projection)
-            .ToListAsync(ct);
-    }
-
-    public async Task<List<EventParticipantResponse>> GetByUserIdAsync(string userId, CancellationToken ct = default)
-    {
-        if (!await _db.Users.AnyAsync(u => u.KfupmId == userId, ct))
-            throw new NotFoundException(nameof(User), userId);
-
-        return await _db.EventParticipants.AsNoTracking()
-            .Where(ep => ep.UserId == userId)
-            .OrderBy(ep => ep.CreatedAt)
-            .Select(EventParticipantMappingExtensions.Projection)
-            .ToListAsync(ct);
     }
 
     public async Task<EventParticipantResponse> CreateAsync(CreateEventParticipantRequest request, CancellationToken ct = default)

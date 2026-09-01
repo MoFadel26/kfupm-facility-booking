@@ -32,9 +32,10 @@ import { ConfirmDelete } from '@/components/shared/ConfirmDelete'
 import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { PaginationControls } from '@/components/shared/PaginationControls'
 import { createFacility, deleteFacility, listFacilities, updateFacility } from '@/api/facilities'
 import { errorMessage } from '@/api/client'
-import { ALLOWED_GENDERS, ALLOWED_ROLES, FACILITY_TYPES } from '@/types/api'
+import { ALLOWED_GENDERS, ALLOWED_ROLES, FACILITY_TYPES, PAGE_SIZE } from '@/types/api'
 import type {
   AllowedGender,
   AllowedRole,
@@ -63,6 +64,8 @@ function validate(form: FacilityRequest): Partial<Record<keyof FacilityRequest, 
 
 export function FacilitiesPage() {
   const [facilities, setFacilities] = useState<FacilityResponse[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -73,12 +76,19 @@ export function FacilitiesPage() {
 
   const load = useCallback(async () => {
     try {
-      setFacilities(await listFacilities())
+      const result = await listFacilities({ page, pageSize: PAGE_SIZE })
+      // Deleting the last row of the last page leaves the view past the end.
+      if (result.items.length === 0 && result.totalPages > 0 && page > result.totalPages) {
+        setPage(result.totalPages)
+        return
+      }
+      setFacilities(result.items)
+      setPageMeta({ totalCount: result.totalCount, totalPages: result.totalPages })
       setLoadError(null)
     } catch (error) {
       setLoadError(errorMessage(error))
     }
-  }, [])
+  }, [page])
 
   useEffect(() => {
     void load()
@@ -193,6 +203,14 @@ export function FacilitiesPage() {
           </TableBody>
         </Table>
       </div>
+
+      <PaginationControls
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={pageMeta.totalCount}
+        totalPages={pageMeta.totalPages}
+        onPageChange={setPage}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

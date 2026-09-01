@@ -17,16 +17,11 @@ public class EventParticipantsController : ControllerBase
 
     /// <summary>Lists participants, optionally filtered by user or reservation.</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<EventParticipantResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedResult<EventParticipantResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<EventParticipantResponse>>> GetAll([FromQuery] string? userId, [FromQuery] string? reservationId, CancellationToken ct)
-    {
-        if (userId is not null)
-            return Ok(await _eventParticipantService.GetByUserIdAsync(userId, ct));
-        if (reservationId is not null)
-            return Ok(await _eventParticipantService.GetByReservationIdAsync(reservationId, ct));
-        return Ok(await _eventParticipantService.GetAllAsync(ct));
-    }
+    public async Task<ActionResult<PagedResult<EventParticipantResponse>>> GetAll([FromQuery] EventParticipantQuery query, CancellationToken ct)
+        => Ok(await _eventParticipantService.GetAllAsync(query, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(EventParticipantResponse), StatusCodes.Status200OK)]

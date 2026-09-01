@@ -33,10 +33,9 @@ public class ResponseProjectionTests : ApiTestBase
     {
         await ArrangeAsync();
 
-        var reservations = await Client.GetFromJsonAsync<List<ReservationResponse>>(
-            "/api/reservations", ApiFixture.Json);
+        var reservations = await GetPageAsync<ReservationResponse>("/api/reservations");
 
-        AssertJoinedFields(Assert.Single(reservations!));
+        AssertJoinedFields(Assert.Single(reservations.Items));
     }
 
     [Fact]
@@ -44,24 +43,21 @@ public class ResponseProjectionTests : ApiTestBase
     {
         await ArrangeAsync();
 
-        var byUser = await Client.GetFromJsonAsync<List<ReservationResponse>>(
-            "/api/reservations?userId=202300001", ApiFixture.Json);
-        var byFacility = await Client.GetFromJsonAsync<List<ReservationResponse>>(
-            "/api/reservations?facilityId=F-B22-124", ApiFixture.Json);
+        var byUser = await GetPageAsync<ReservationResponse>("/api/reservations?userId=202300001");
+        var byFacility = await GetPageAsync<ReservationResponse>("/api/reservations?facilityId=F-B22-124");
 
-        AssertJoinedFields(Assert.Single(byUser!));
-        AssertJoinedFields(Assert.Single(byFacility!));
+        AssertJoinedFields(Assert.Single(byUser.Items));
+        AssertJoinedFields(Assert.Single(byFacility.Items));
     }
 
     [Fact]
     public async Task Fetching_one_reservation_includes_the_facility_and_user_names()
     {
         await ArrangeAsync();
-        var listed = await Client.GetFromJsonAsync<List<ReservationResponse>>(
-            "/api/reservations", ApiFixture.Json);
+        var listed = await GetPageAsync<ReservationResponse>("/api/reservations");
 
         var reservation = await Client.GetFromJsonAsync<ReservationResponse>(
-            $"/api/reservations/{listed![0].Id}", ApiFixture.Json);
+            $"/api/reservations/{listed.Items[0].Id}", ApiFixture.Json);
 
         AssertJoinedFields(reservation!);
     }
@@ -81,8 +77,7 @@ public class ResponseProjectionTests : ApiTestBase
     public async Task Participants_carry_the_user_name_and_reservation_reason()
     {
         await ArrangeAsync();
-        var reservation = (await Client.GetFromJsonAsync<List<ReservationResponse>>(
-            "/api/reservations", ApiFixture.Json))![0];
+        var reservation = (await GetPageAsync<ReservationResponse>("/api/reservations")).Items[0];
 
         var created = await Client.PostAsJsonAsync("/api/eventparticipants",
             new CreateEventParticipantRequest
@@ -92,10 +87,9 @@ public class ResponseProjectionTests : ApiTestBase
             }, ApiFixture.Json);
         created.EnsureSuccessStatusCode();
 
-        var participants = await Client.GetFromJsonAsync<List<EventParticipantResponse>>(
-            "/api/eventparticipants", ApiFixture.Json);
+        var participants = await GetPageAsync<EventParticipantResponse>("/api/eventparticipants");
 
-        var participant = Assert.Single(participants!);
+        var participant = Assert.Single(participants.Items);
         Assert.Equal("User 202300001", participant.UserName);
         Assert.Equal("Project meeting", participant.ReservationReason);
     }

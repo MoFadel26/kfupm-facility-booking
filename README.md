@@ -103,10 +103,23 @@ docs/              design notes and the ongoing work plan
 ## API
 
 `/api/facilities`, `/api/users`, `/api/reservations`, `/api/eventparticipants` —
-CRUD, except event participants, which are join/leave only. Reservations accept
-`?userId=` or `?facilityId=`. Errors come back as `ProblemDetails`: `400` for a
-malformed request, `404` for an unknown id, `409` for a rule violation
-(overlapping slot, facility restriction, duplicate identifier).
+CRUD, except event participants, which are join/leave only.
+
+Every list endpoint is paged. `?page=` defaults to 1 and `?pageSize=` to 25,
+capped at 100; anything outside that is a `400`.
+
+```json
+{ "items": [...], "page": 1, "pageSize": 25, "totalCount": 137, "totalPages": 6 }
+```
+
+Reservations filter by `?userId=` and `?facilityId=`, and participants by
+`?userId=` and `?reservationId=`. Filters combine, and naming something that
+does not exist is a `404` rather than an empty page.
+
+Errors come back as `ProblemDetails`: `400` for a malformed request, `404` for an
+unknown id, `409` for a rule violation (overlapping slot, facility restriction,
+duplicate identifier, an illegal status transition, or an attempt to change a
+natural key).
 
 ## Status
 

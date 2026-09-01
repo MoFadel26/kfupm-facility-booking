@@ -33,17 +33,18 @@ import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { PaginationControls } from '@/components/shared/PaginationControls'
 import {
   createReservation,
   deleteReservation,
   listReservations,
   updateReservation,
 } from '@/api/reservations'
-import { listFacilities } from '@/api/facilities'
-import { listUsers } from '@/api/users'
+import { listAllFacilities } from '@/api/facilities'
+import { listAllUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
 import { formatRange, fromInputValue, toInputValue } from '@/lib/datetime'
-import { allowedStatusTransitions } from '@/types/api'
+import { PAGE_SIZE, allowedStatusTransitions } from '@/types/api'
 import type {
   FacilityResponse,
   ReservationResponse,
@@ -94,6 +95,8 @@ function validate(form: FormState, isEdit: boolean): Partial<Record<keyof FormSt
 
 export function ReservationsPage() {
   const [reservations, setReservations] = useState<ReservationResponse[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
   const [loadError, setLoadError] = useState<string | null>(null)
   const [facilities, setFacilities] = useState<FacilityResponse[]>([])
   const [users, setUsers] = useState<UserResponse[]>([])
@@ -108,17 +111,29 @@ export function ReservationsPage() {
 
   const load = useCallback(async () => {
     try {
-      const filter =
-        userFilter !== ALL
-          ? { userId: userFilter }
-          : facilityFilter !== ALL
-            ? { facilityId: facilityFilter }
-            : undefined
-      setReservations(await listReservations(filter))
+      // Both filters are sent together — picking one used to silently drop the other.
+      const result = await listReservations({
+        userId: userFilter !== ALL ? userFilter : undefined,
+        facilityId: facilityFilter !== ALL ? facilityFilter : undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      })
+      // Deleting the last row of the last page leaves the view past the end.
+      if (result.items.length === 0 && result.totalPages > 0 && page > result.totalPages) {
+        setPage(result.totalPages)
+        return
+      }
+      setReservations(result.items)
+      setPageMeta({ totalCount: result.totalCount, totalPages: result.totalPages })
       setLoadError(null)
     } catch (error) {
       setLoadError(errorMessage(error))
     }
+  }, [facilityFilter, userFilter, page])
+
+  // A narrower filter can leave the current page beyond the new result set.
+  useEffect(() => {
+    setPage(1)
   }, [facilityFilter, userFilter])
 
   useEffect(() => {
@@ -126,8 +141,8 @@ export function ReservationsPage() {
   }, [load])
 
   useEffect(() => {
-    listFacilities().then(setFacilities).catch(() => setFacilities([]))
-    listUsers().then(setUsers).catch(() => setUsers([]))
+    listAllFacilities().then(setFacilities).catch(() => setFacilities([]))
+    listAllUsers().then(setUsers).catch(() => setUsers([]))
   }, [])
 
   function openCreate() {
@@ -303,6 +318,14 @@ export function ReservationsPage() {
           </TableBody>
         </Table>
       </div>
+
+      <PaginationControls
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={pageMeta.totalCount}
+        totalPages={pageMeta.totalPages}
+        onPageChange={setPage}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">

@@ -1,12 +1,24 @@
 import { api } from './client'
-import type { CreateEventParticipantRequest, EventParticipantResponse } from '@/types/api'
+import { pageQuery, withQuery } from './paging'
+import type {
+  CreateEventParticipantRequest,
+  EventParticipantResponse,
+  PageParams,
+  PagedResult,
+} from '@/types/api'
 
-export function listParticipants(filter?: { userId?: string; reservationId?: string }) {
+export interface ParticipantFilter extends PageParams {
+  userId?: string
+  reservationId?: string
+}
+
+export function listParticipants(filter?: ParticipantFilter) {
   const params = new URLSearchParams()
   if (filter?.userId) params.set('userId', filter.userId)
   if (filter?.reservationId) params.set('reservationId', filter.reservationId)
-  const query = params.toString()
-  return api.get<EventParticipantResponse[]>(`/api/eventparticipants${query ? `?${query}` : ''}`)
+  return api.get<PagedResult<EventParticipantResponse>>(
+    withQuery('/api/eventparticipants', pageQuery(filter, params)),
+  )
 }
 
 export const getParticipant = (id: string) =>

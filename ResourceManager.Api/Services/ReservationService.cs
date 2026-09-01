@@ -16,12 +16,31 @@ public class ReservationService : IReservationService
         _db = db;
     }
 
-    public async Task<List<ReservationResponse>> GetAllAsync(CancellationToken ct = default)
+    public async Task<PagedResult<ReservationResponse>> GetAllAsync(ReservationQuery query, CancellationToken ct = default)
     {
-        return await _db.Reservations.AsNoTracking()
+        // A filter naming something that does not exist is a client mistake worth
+        // reporting, not an empty page that looks like "nobody booked anything".
+        if (query.UserId is not null && !await _db.Users.AnyAsync(u => u.KfupmId == query.UserId, ct))
+            throw new NotFoundException(nameof(User), query.UserId);
+
+        if (query.FacilityId is not null && !await _db.Facilities.AnyAsync(f => f.FacilityId == query.FacilityId, ct))
+            throw new NotFoundException(nameof(Facility), query.FacilityId);
+
+        var reservations = _db.Reservations.AsNoTracking();
+
+        // Both filters apply. They used to be checked one after the other, so asking for
+        // a user's bookings at a given facility quietly ignored the facility.
+        if (query.UserId is not null)
+            reservations = reservations.Where(r => r.UserId == query.UserId);
+
+        if (query.FacilityId is not null)
+            reservations = reservations.Where(r => r.FacilityId == query.FacilityId);
+
+        return await reservations
             .OrderBy(r => r.StartTime)
+            .ThenBy(r => r.Id)
             .Select(ReservationMappingExtensions.Projection)
-            .ToListAsync(ct);
+            .ToPagedResultAsync(query, ct);
     }
 
     public async Task<ReservationResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -31,30 +50,6 @@ public class ReservationService : IReservationService
             .Select(ReservationMappingExtensions.Projection)
             .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException(nameof(Reservation), id);
-    }
-
-    public async Task<List<ReservationResponse>> GetByUserIdAsync(string userId, CancellationToken ct = default)
-    {
-        if (!await _db.Users.AnyAsync(u => u.KfupmId == userId, ct))
-            throw new NotFoundException(nameof(User), userId);
-
-        return await _db.Reservations.AsNoTracking()
-            .Where(r => r.UserId == userId)
-            .OrderBy(r => r.StartTime)
-            .Select(ReservationMappingExtensions.Projection)
-            .ToListAsync(ct);
-    }
-
-    public async Task<List<ReservationResponse>> GetByFacilityIdAsync(string facilityId, CancellationToken ct = default)
-    {
-        if (!await _db.Facilities.AnyAsync(f => f.FacilityId == facilityId, ct))
-            throw new NotFoundException(nameof(Facility), facilityId);
-
-        return await _db.Reservations.AsNoTracking()
-            .Where(r => r.FacilityId == facilityId)
-            .OrderBy(r => r.StartTime)
-            .Select(ReservationMappingExtensions.Projection)
-            .ToListAsync(ct);
     }
 
     public async Task<ReservationResponse> CreateAsync(CreateReservationRequest request, CancellationToken ct = default)

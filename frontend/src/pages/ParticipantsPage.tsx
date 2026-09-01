@@ -30,16 +30,20 @@ import { ConfirmDelete } from '@/components/shared/ConfirmDelete'
 import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { PaginationControls } from '@/components/shared/PaginationControls'
 import { createParticipant, deleteParticipant, listParticipants } from '@/api/participants'
-import { listReservations } from '@/api/reservations'
-import { listUsers } from '@/api/users'
+import { listAllReservations } from '@/api/reservations'
+import { listAllUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
+import { PAGE_SIZE } from '@/types/api'
 import type { EventParticipantResponse, ReservationResponse, UserResponse } from '@/types/api'
 
 const ALL = 'all'
 
 export function ParticipantsPage() {
   const [participants, setParticipants] = useState<EventParticipantResponse[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
   const [loadError, setLoadError] = useState<string | null>(null)
   const [users, setUsers] = useState<UserResponse[]>([])
   const [reservations, setReservations] = useState<ReservationResponse[]>([])
@@ -53,12 +57,26 @@ export function ParticipantsPage() {
 
   const load = useCallback(async () => {
     try {
-      const filter = reservationFilter !== ALL ? { reservationId: reservationFilter } : undefined
-      setParticipants(await listParticipants(filter))
+      const result = await listParticipants({
+        reservationId: reservationFilter !== ALL ? reservationFilter : undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      })
+      // Deleting the last row of the last page leaves the view past the end.
+      if (result.items.length === 0 && result.totalPages > 0 && page > result.totalPages) {
+        setPage(result.totalPages)
+        return
+      }
+      setParticipants(result.items)
+      setPageMeta({ totalCount: result.totalCount, totalPages: result.totalPages })
       setLoadError(null)
     } catch (error) {
       setLoadError(errorMessage(error))
     }
+  }, [reservationFilter, page])
+
+  useEffect(() => {
+    setPage(1)
   }, [reservationFilter])
 
   useEffect(() => {
@@ -66,8 +84,8 @@ export function ParticipantsPage() {
   }, [load])
 
   useEffect(() => {
-    listUsers().then(setUsers).catch(() => setUsers([]))
-    listReservations().then(setReservations).catch(() => setReservations([]))
+    listAllUsers().then(setUsers).catch(() => setUsers([]))
+    listAllReservations().then(setReservations).catch(() => setReservations([]))
   }, [])
 
   function openCreate() {
@@ -180,6 +198,14 @@ export function ParticipantsPage() {
           </TableBody>
         </Table>
       </div>
+
+      <PaginationControls
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={pageMeta.totalCount}
+        totalPages={pageMeta.totalPages}
+        onPageChange={setPage}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

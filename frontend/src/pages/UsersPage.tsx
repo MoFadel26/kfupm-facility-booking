@@ -32,9 +32,10 @@ import { ConfirmDelete } from '@/components/shared/ConfirmDelete'
 import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { PaginationControls } from '@/components/shared/PaginationControls'
 import { createUser, deleteUser, listUsers, updateUser } from '@/api/users'
 import { errorMessage } from '@/api/client'
-import { GENDERS, USER_ROLES } from '@/types/api'
+import { GENDERS, PAGE_SIZE, USER_ROLES } from '@/types/api'
 import type { Gender, UserRequest, UserResponse, UserRole } from '@/types/api'
 
 const EMPTY_FORM: UserRequest = {
@@ -60,6 +61,8 @@ function validate(form: UserRequest): Partial<Record<keyof UserRequest, string>>
 
 export function UsersPage() {
   const [users, setUsers] = useState<UserResponse[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -70,12 +73,19 @@ export function UsersPage() {
 
   const load = useCallback(async () => {
     try {
-      setUsers(await listUsers())
+      const result = await listUsers({ page, pageSize: PAGE_SIZE })
+      // Deleting the last row of the last page leaves the view past the end.
+      if (result.items.length === 0 && result.totalPages > 0 && page > result.totalPages) {
+        setPage(result.totalPages)
+        return
+      }
+      setUsers(result.items)
+      setPageMeta({ totalCount: result.totalCount, totalPages: result.totalPages })
       setLoadError(null)
     } catch (error) {
       setLoadError(errorMessage(error))
     }
-  }, [])
+  }, [page])
 
   useEffect(() => {
     void load()
@@ -190,6 +200,14 @@ export function UsersPage() {
           </TableBody>
         </Table>
       </div>
+
+      <PaginationControls
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={pageMeta.totalCount}
+        totalPages={pageMeta.totalPages}
+        onPageChange={setPage}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

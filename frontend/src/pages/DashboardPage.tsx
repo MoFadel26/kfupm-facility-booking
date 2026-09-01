@@ -15,7 +15,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
 import { listFacilities } from '@/api/facilities'
 import { listParticipants } from '@/api/participants'
-import { listReservations } from '@/api/reservations'
+import { listAllReservations, listReservations } from '@/api/reservations'
 import { listUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
 import { formatRange } from '@/lib/datetime'
@@ -34,17 +34,27 @@ export function DashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([listUsers(), listFacilities(), listReservations(), listParticipants()])
-      .then(([users, facilities, reservations, participants]) => {
+    // The totals come from each endpoint's totalCount, so a one-row page is enough —
+    // no need to transfer every record just to count it. The upcoming list still needs
+    // the reservations themselves, since "upcoming" is not a filter the API offers.
+    const countOnly = { page: 1, pageSize: 1 }
+    Promise.all([
+      listUsers(countOnly),
+      listFacilities(countOnly),
+      listReservations(countOnly),
+      listParticipants(countOnly),
+      listAllReservations(),
+    ])
+      .then(([users, facilities, reservations, participants, allReservations]) => {
         setStats({
-          users: users.length,
-          facilities: facilities.length,
-          reservations: reservations.length,
-          participants: participants.length,
+          users: users.totalCount,
+          facilities: facilities.totalCount,
+          reservations: reservations.totalCount,
+          participants: participants.totalCount,
         })
         const now = Date.now()
         setUpcoming(
-          reservations
+          allReservations
             .filter((r) => new Date(r.endTime).getTime() >= now && r.status !== 'Cancelled')
             .slice(0, 5),
         )

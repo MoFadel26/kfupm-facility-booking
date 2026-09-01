@@ -1,3 +1,24 @@
+/** Mirrors the API's PagedResult<T>. Every list endpoint returns one of these. */
+export interface PagedResult<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  /** Rows matching the filter, not rows on this page. */
+  totalCount: number
+  totalPages: number
+}
+
+export interface PageParams {
+  page?: number
+  pageSize?: number
+}
+
+/** The API's PageQuery.MaxPageSize. Requesting more is a 400. */
+export const MAX_PAGE_SIZE = 100
+
+/** Rows per table page. Matches the API's default so an unparameterised call agrees. */
+export const PAGE_SIZE = 25
+
 // TypeScript mirrors of the backend DTOs (ResourceManager.Api/DTO).
 // Enums travel as strings (JsonStringEnumConverter on the backend).
 

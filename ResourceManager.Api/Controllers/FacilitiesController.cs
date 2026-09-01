@@ -16,9 +16,10 @@ public class FacilitiesController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(List<FacilityResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<FacilityResponse>>> GetAll(CancellationToken ct)
-        => Ok(await _facilityService.GetAllAsync(ct));
+    [ProducesResponseType(typeof(PagedResult<FacilityResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PagedResult<FacilityResponse>>> GetAll([FromQuery] PageQuery query, CancellationToken ct)
+        => Ok(await _facilityService.GetAllAsync(query, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(FacilityResponse), StatusCodes.Status200OK)]

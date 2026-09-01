@@ -201,17 +201,21 @@ Second contract break. Do the frontend update in the same pass as Phase 3's.
 - [ ] Skim "Generating OpenAPI Contracts"
 
 ### Ship
-- [ ] Paged, filtered, sorted list endpoints. `GetAllAsync` currently returns
-      every row unbounded, and `GetAll` checks `userId` then `facilityId` in
-      sequence, so passing both silently ignores the second.
-- [ ] A shared `PagedResult<T>` response shape, and the frontend updated to it
+- [x] Paged, filtered list endpoints on all four resources. Paging is always on
+      (default 25, max 100) rather than opt-in, so the unbounded default is gone.
+      Both reservation filters now apply together — they used to be checked in
+      sequence, silently dropping the second.
+- [x] Shared `PagedResult<T>`, and the frontend updated to it: table pages carry
+      Previous/Next controls, and the select dropdowns walk every page rather than
+      silently showing only the first 25 options.
 - [x] Pushed projection into the query. Each DTO class exposes an
       `Expression<Func<TEntity, TResponse>> Projection` that EF translates into the
       SELECT list; `ToResponse` is its compiled form, so there is one mapping.
       `GET /api/reservations` now issues a single query selecting eleven columns
       across two joins, with no entities materialised.
 - [ ] Build the filtering and paging once from memory, then diff against the
-      course code and note what you missed
+      course code and note what you missed — worth doing even though the code now
+      exists; the point is whether you can reproduce it.
 - [ ] Publish the OpenAPI document as a build artifact in CI
 
 **Self-check:** At what row count does offset pagination become the wrong choice,
