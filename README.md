@@ -97,7 +97,7 @@ ResourceManager.Api/
   Migrations/
 ResourceManager.Api.Tests/  integration tests against a real database
 frontend/          React client
-docs/              design notes and the ongoing work plan
+docs/              architecture decisions, design notes, work plan
 ```
 
 ## API
@@ -159,6 +159,13 @@ One entry per request (method, path, query, status, duration) plus a line for ea
 rejection and its reason. Error responses carry a `traceId` matching the log entry,
 so a reported error can be traced to the request that caused it. Console output is
 JSON outside Development.
+
+## Why it is built this way
+
+[docs/architecture.md](docs/architecture.md) covers the decisions and their
+trade-offs: why the overlap rule is a database constraint, why foreign keys point at
+natural keys, why responses are projected in SQL, and why the tests need a real
+PostgreSQL.
 
 ## Status
 
