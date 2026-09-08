@@ -17,6 +17,7 @@ public class EventParticipantsController : ControllerBase
 
     /// <summary>Lists participants, optionally filtered by user or reservation.</summary>
     [HttpGet]
+    // More like documentation for Swagger, but also helps with OpenAPI generation and client code generation.
     [ProducesResponseType(typeof(PagedResult<EventParticipantResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
