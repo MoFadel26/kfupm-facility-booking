@@ -92,22 +92,24 @@ if (builder.Configuration.GetValue("Database:MigrateOnStartup", true))
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 
-    // Sample data is for local development only. Tests need an empty database and
-    // production needs its own, so neither gets it.
-    if (app.Environment.IsDevelopment())
+    // Sample data is on in development. Tests need an empty database, so they never get it.
+    // A demo deployment has no way to add data through its read-only API, so it opts in
+    // with Database:SeedSampleData.
+    if (app.Environment.IsDevelopment() || builder.Configuration.GetValue("Database:SeedSampleData", false))
         await DbSeeder.SeedAsync(db);
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// The API docs are on in development. A demo deployment opts in with ApiDocs:Enabled so
+// visitors can browse the API.
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue("ApiDocs:Enabled", false))
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-else
-{
+
+if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
-}
 
 // Outside the exception handler on purpose. Inside it, an exception unwinds past this
 // middleware before the handler has written the real status, and every error gets logged
