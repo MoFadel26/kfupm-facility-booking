@@ -6,3 +6,11 @@ riderModule.iml
 .CHANGES.md
 *.DotSettings.user
 resume/
+
+# AI agent tools & skills
+.agents/
+.gemini/
+.impeccable/
+.github/agents/
+.github/hooks/
+.github/skills/

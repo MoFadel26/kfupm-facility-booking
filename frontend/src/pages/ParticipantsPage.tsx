@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, CalendarRange, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,12 +31,20 @@ import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
 import { PaginationControls } from '@/components/shared/PaginationControls'
-import { createParticipant, deleteParticipant, listParticipants } from '@/api/participants'
+import {
+  createParticipant,
+  deleteParticipant,
+  listParticipants,
+} from '@/api/participants'
 import { listAllReservations } from '@/api/reservations'
 import { listAllUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
 import { PAGE_SIZE } from '@/types/api'
-import type { EventParticipantResponse, ReservationResponse, UserResponse } from '@/types/api'
+import type {
+  EventParticipantResponse,
+  ReservationResponse,
+  UserResponse,
+} from '@/types/api'
 
 const ALL = 'all'
 
@@ -45,9 +53,10 @@ export function ParticipantsPage() {
   const [page, setPage] = useState(1)
   const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [users, setUsers] = useState<UserResponse[]>([])
-  const [reservations, setReservations] = useState<ReservationResponse[]>([])
+
   const [reservationFilter, setReservationFilter] = useState<string>(ALL)
+  const [reservations, setReservations] = useState<ReservationResponse[]>([])
+  const [users, setUsers] = useState<UserResponse[]>([])
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formUserId, setFormUserId] = useState('')
@@ -62,7 +71,6 @@ export function ParticipantsPage() {
         page,
         pageSize: PAGE_SIZE,
       })
-      // Deleting the last row of the last page leaves the view past the end.
       if (result.items.length === 0 && result.totalPages > 0 && page > result.totalPages) {
         setPage(result.totalPages)
         return
@@ -90,25 +98,25 @@ export function ParticipantsPage() {
 
   function openCreate() {
     setFormUserId('')
-    setFormReservationId('')
+    setFormReservationId(reservationFilter !== ALL ? reservationFilter : '')
     setFieldErrors({})
     setDialogOpen(true)
   }
 
   async function submit() {
     const errors: { userId?: string; reservationId?: string } = {}
-    if (!formUserId) errors.userId = 'Pick a user.'
-    if (!formReservationId) errors.reservationId = 'Pick a reservation.'
+    if (!formUserId) errors.userId = 'Select a campus member.'
+    if (!formReservationId) errors.reservationId = 'Select a reservation.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
     setSaving(true)
     try {
-      const created = await createParticipant({
+      await createParticipant({
         userId: formUserId,
         reservationId: formReservationId,
       })
-      toast.success(`${created.userName} joined ${created.reservationRef}.`)
+      toast.success('Participant added to reservation roster.')
       setDialogOpen(false)
       await load()
     } catch (error) {
@@ -121,53 +129,98 @@ export function ParticipantsPage() {
   async function remove(participant: EventParticipantResponse) {
     try {
       await deleteParticipant(participant.id)
-      toast.success(`${participant.userName} removed from ${participant.reservationRef}.`)
+      toast.success(`Removed ${participant.userName} from reservation.`)
       await load()
     } catch (error) {
       toast.error(errorMessage(error))
     }
   }
 
-  const reservationLabel = (reservation: ReservationResponse) =>
-    `${reservation.reservationId} — ${reservation.facilityName} (${reservation.reason})`
+  const selectedReservationObj = reservations.find((r) => r.id === reservationFilter)
 
   return (
-    <div>
+    <div className="space-y-8">
       <PageHeader
-        title="Participants"
-        description="Who is attending which reservation. Capacity and facility rules apply."
+        title="Event Participants"
+        description="Oversee attendee rosters, verify member eligibility, and register participants for campus spaces."
         action={
-          <Button onClick={openCreate}>
-            <Plus className="size-4" /> Add participant
+          <Button onClick={openCreate} className="h-8 px-3 text-xs font-semibold shadow-xs">
+            <Plus className="size-3.5 mr-1" /> Add Participant
           </Button>
         }
       />
 
-      <div className="mb-4">
-        <Select value={reservationFilter} onValueChange={setReservationFilter}>
-          <SelectTrigger className="w-96">
-            <SelectValue placeholder="All reservations" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All reservations</SelectItem>
-            {reservations.map((reservation) => (
-              <SelectItem key={reservation.id} value={reservation.id}>
-                {reservationLabel(reservation)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Filter and Active Reservation Banner: Supabase Studio Toolbar */}
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+              <CalendarRange className="size-3.5" /> Scope Reservation:
+            </span>
+            <Select value={reservationFilter} onValueChange={setReservationFilter}>
+              <SelectTrigger className="w-[300px] h-8 text-xs bg-background rounded-md">
+                <SelectValue placeholder="All reservations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All reservations ({reservations.length})</SelectItem>
+                {reservations.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.reservationId} — {r.facilityName} ({r.userName})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {reservationFilter !== ALL && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setReservationFilter(ALL)}
+              >
+                Clear Scope
+              </Button>
+            )}
+          </div>
+
+          <div className="text-xs text-muted-foreground font-mono">
+            Roster Entries: <strong className="text-foreground">{pageMeta.totalCount}</strong>
+          </div>
+        </div>
+
+        {selectedReservationObj && (
+          <div className="rounded-md bg-secondary border border-border p-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <span className="font-medium text-foreground flex items-center gap-1.5">
+                <Building2 className="size-3 text-primary" /> {selectedReservationObj.facilityName}
+              </span>
+              <span className="text-muted-foreground">
+                Booked by: <strong className="text-foreground">{selectedReservationObj.userName}</strong>
+              </span>
+            </div>
+            <span className="text-muted-foreground font-mono">
+              Target: {selectedReservationObj.targetParticipantCount} members
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      {loadError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive">
+          {loadError}
+        </div>
+      )}
+
+      {/* Participants Table */}
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/40">
             <TableRow>
-              <TableHead>Participant</TableHead>
-              <TableHead>KFUPM ID</TableHead>
-              <TableHead>Reservation</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead className="w-16 text-right">Actions</TableHead>
+              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Participant</TableHead>
+              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">KFUPM ID</TableHead>
+              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Reservation Ref</TableHead>
+              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Activity Purpose</TableHead>
+              <TableHead className="w-24 text-right font-medium text-xs text-muted-foreground uppercase font-mono">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -176,20 +229,38 @@ export function ParticipantsPage() {
             ) : participants === null ? (
               <LoadingRow colSpan={5} />
             ) : participants.length === 0 ? (
-              <EmptyRow colSpan={5} message="No participants match — add one." />
+              <EmptyRow
+                colSpan={5}
+                message={
+                  reservationFilter !== ALL
+                    ? 'No participants registered for this reservation yet.'
+                    : 'No participants recorded across any reservations.'
+                }
+              />
             ) : (
-              participants.map((participant) => (
-                <TableRow key={participant.id}>
-                  <TableCell className="font-medium">{participant.userName}</TableCell>
-                  <TableCell className="font-mono text-xs">{participant.userKfupmId}</TableCell>
-                  <TableCell className="font-mono text-xs">{participant.reservationRef}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {participant.reservationReason}
+              participants.map((p) => (
+                <TableRow key={p.id} className="hover:bg-muted/30 transition-colors">
+                  <TableCell className="font-medium text-xs text-foreground">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-full bg-secondary border border-border text-[11px] font-medium text-foreground">
+                        {p.userName.charAt(0).toUpperCase()}
+                      </div>
+                      <span>{p.userName}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs font-medium text-primary">
+                    {p.userKfupmId}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-foreground">
+                    {p.reservationId}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={p.reservationReason}>
+                    {p.reservationReason}
                   </TableCell>
                   <TableCell className="text-right">
                     <ConfirmDelete
-                      description={`Remove ${participant.userName} from ${participant.reservationRef}?`}
-                      onConfirm={() => remove(participant)}
+                      description={`Remove ${p.userName} from this reservation roster?`}
+                      onConfirm={() => remove(p)}
                     />
                   </TableCell>
                 </TableRow>
@@ -199,6 +270,7 @@ export function ParticipantsPage() {
         </Table>
       </div>
 
+      {/* Pagination */}
       <PaginationControls
         page={page}
         pageSize={PAGE_SIZE}
@@ -207,57 +279,58 @@ export function ParticipantsPage() {
         onPageChange={setPage}
       />
 
+      {/* Add Participant Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md rounded-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">Add participant</DialogTitle>
-            <DialogDescription>
-              Join a user to a reservation. The reservation must have free seats and the user must
-              satisfy the facility's rules.
+            <DialogTitle className="text-lg font-medium tracking-tight">Add Event Participant</DialogTitle>
+            <DialogDescription className="text-xs">
+              Enroll a university member into an existing space reservation roster.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>User</Label>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Select Campus Member</Label>
               <Select value={formUserId} onValueChange={setFormUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a user" />
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Choose a member" />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.name} ({user.kfupmId})
+                      {user.name} ({user.kfupmId} · {user.role})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FieldError message={fieldErrors.userId} />
             </div>
-            <div className="grid gap-2">
-              <Label>Reservation</Label>
+
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Target Reservation</Label>
               <Select value={formReservationId} onValueChange={setFormReservationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a reservation" />
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Choose reservation" />
                 </SelectTrigger>
                 <SelectContent>
-                  {reservations
-                    .filter((reservation) => reservation.status !== 'Cancelled')
-                    .map((reservation) => (
-                      <SelectItem key={reservation.id} value={reservation.id}>
-                        {reservationLabel(reservation)}
-                      </SelectItem>
-                    ))}
+                  {reservations.map((reservation) => (
+                    <SelectItem key={reservation.id} value={reservation.id}>
+                      {reservation.reservationId} — {reservation.facilityName} ({reservation.userName})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FieldError message={fieldErrors.reservationId} />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving} className="h-8 text-xs">
               Cancel
             </Button>
-            <Button onClick={submit} disabled={saving}>
-              {saving ? 'Adding…' : 'Add participant'}
+            <Button onClick={submit} disabled={saving} className="h-8 text-xs font-semibold">
+              {saving ? 'Adding...' : 'Add to Roster'}
             </Button>
           </DialogFooter>
         </DialogContent>
