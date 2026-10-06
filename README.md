@@ -3,9 +3,6 @@
 Facility booking for KFUPM. Users book shared spaces (classrooms, labs, the pool,
 courts, the gym) for a time slot and invite others to join.
 
-> **Not production-ready.** There is no authentication yet. Anyone who reaches the
-> API can create, change, or cancel any reservation.
-
 ## Rules
 
 - Two active reservations for the same facility cannot overlap. A booking ending
