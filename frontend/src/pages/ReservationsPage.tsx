@@ -310,7 +310,7 @@ export function ReservationsPage() {
                 <SelectContent>
                   <SelectItem value={ALL}>All facilities</SelectItem>
                   {facilities.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
+                    <SelectItem key={f.id} value={f.facilityId}>
                       {f.name}
                     </SelectItem>
                   ))}
@@ -329,7 +329,7 @@ export function ReservationsPage() {
                 <SelectContent>
                   <SelectItem value={ALL}>All users</SelectItem>
                   {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
+                    <SelectItem key={u.id} value={u.kfupmId}>
                       {u.name}
                     </SelectItem>
                   ))}
@@ -529,7 +529,7 @@ export function ReservationsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {facilities.map((facility) => (
-                        <SelectItem key={facility.id} value={facility.id}>
+                        <SelectItem key={facility.id} value={facility.facilityId}>
                           {facility.name} ({facility.type})
                         </SelectItem>
                       ))}
@@ -549,7 +549,7 @@ export function ReservationsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
+                        <SelectItem key={user.id} value={user.kfupmId}>
                           {user.name} ({user.kfupmId})
                         </SelectItem>
                       ))}
