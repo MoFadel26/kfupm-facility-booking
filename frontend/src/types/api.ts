@@ -113,7 +113,6 @@ export interface ReservationResponse {
   status: ReservationStatus
   targetParticipantCount: number
   facilityId: string
-  facilityRef: string
   facilityName: string
   userId: string
   userName: string
@@ -130,8 +129,6 @@ export interface EventParticipantResponse {
   id: string
   userId: string
   userName: string
-  userKfupmId: string
   reservationId: string
-  reservationRef: string
   reservationReason: string
 }
