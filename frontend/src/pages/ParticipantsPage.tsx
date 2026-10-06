@@ -136,7 +136,7 @@ export function ParticipantsPage() {
     }
   }
 
-  const selectedReservationObj = reservations.find((r) => r.id === reservationFilter)
+  const selectedReservationObj = reservations.find((r) => r.reservationId === reservationFilter)
 
   return (
     <div className="space-y-8">
@@ -164,7 +164,7 @@ export function ParticipantsPage() {
               <SelectContent>
                 <SelectItem value={ALL}>All reservations ({reservations.length})</SelectItem>
                 {reservations.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
+                  <SelectItem key={r.id} value={r.reservationId}>
                     {r.reservationId} — {r.facilityName} ({r.userName})
                   </SelectItem>
                 ))}
@@ -249,7 +249,7 @@ export function ParticipantsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs font-medium text-primary">
-                    {p.userKfupmId}
+                    {p.userId}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-foreground">
                     {p.reservationId}
@@ -298,7 +298,7 @@ export function ParticipantsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
+                    <SelectItem key={user.id} value={user.kfupmId}>
                       {user.name} ({user.kfupmId} · {user.role})
                     </SelectItem>
                   ))}
@@ -315,7 +315,7 @@ export function ParticipantsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {reservations.map((reservation) => (
-                    <SelectItem key={reservation.id} value={reservation.id}>
+                    <SelectItem key={reservation.id} value={reservation.reservationId}>
                       {reservation.reservationId} — {reservation.facilityName} ({reservation.userName})
                     </SelectItem>
                   ))}
