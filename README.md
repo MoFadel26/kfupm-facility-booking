@@ -1,7 +1,5 @@
 # ResourceManager
 
-![Demo](docs/demo.gif)
-
 Facility booking for KFUPM. Users book shared spaces (classrooms, labs, the pool,
 courts, the gym) for a time slot and invite others to join.
 
