@@ -58,6 +58,7 @@ import type {
   FacilityResponse,
   FacilityType,
 } from '@/types/api'
+import { validateFacility } from '@/lib/validation'
 
 const EMPTY_FORM: FacilityRequest = {
   facilityId: '',
@@ -83,15 +84,6 @@ function getFacilityIcon(type: FacilityType) {
     default:
       return Building2
   }
-}
-
-function validate(form: FacilityRequest): Partial<Record<keyof FacilityRequest, string>> {
-  const errors: Partial<Record<keyof FacilityRequest, string>> = {}
-  if (!form.facilityId.trim()) errors.facilityId = 'Facility ID is required.'
-  else if (form.facilityId.length > 20) errors.facilityId = 'At most 20 characters.'
-  if (!form.name.trim()) errors.name = 'Name is required.'
-  else if (form.name.length > 50) errors.name = 'At most 50 characters.'
-  return errors
 }
 
 export function FacilitiesPage() {
@@ -151,7 +143,7 @@ export function FacilitiesPage() {
   }
 
   async function submit() {
-    const errors = validate(form)
+    const errors = validateFacility(form)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
