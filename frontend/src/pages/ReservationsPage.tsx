@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PlusIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -126,6 +127,20 @@ export function ReservationsPage() {
     listAllFacilities().then(setFacilities).catch(() => setFacilities([]))
     listAllUsers().then(setUsers).catch(() => setUsers([]))
   }, [])
+
+  // A facility's "Book" link lands here with ?facilityId=<id>: open the form with it chosen.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const requested = searchParams.get('facilityId')
+    if (!requested || facilities.length === 0) return
+    setSearchParams({}, { replace: true })
+    const facility = facilities.find((f) => f.id === requested || f.facilityId === requested)
+    if (!facility) return
+    setEditing(null)
+    setForm({ ...EMPTY_FORM, facilityId: facility.facilityId })
+    setFieldErrors({})
+    setDialogOpen(true)
+  }, [facilities, searchParams, setSearchParams])
 
   function openCreate() {
     setEditing(null)
