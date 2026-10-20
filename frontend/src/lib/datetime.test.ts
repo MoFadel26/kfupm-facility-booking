@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateDuration, fromInputValue, toInputValue } from '@/lib/datetime'
+import { calculateDuration, formatRangeLines, fromInputValue, toInputValue } from '@/lib/datetime'
 
 describe('calculateDuration', () => {
   it('returns null when either value is missing', () => {
@@ -42,5 +42,17 @@ describe('toInputValue / fromInputValue', () => {
   it('round-trips through the input value', () => {
     const iso = '2026-07-10T10:05:00.000Z'
     expect(fromInputValue(toInputValue(iso))).toBe(iso)
+  })
+})
+
+describe('formatRangeLines', () => {
+  it('shows one date for a same-day range', () => {
+    const { date, time } = formatRangeLines('2026-07-10T10:00', '2026-07-10T12:00')
+    expect(date).not.toContain('–')
+    expect(time).toContain('–')
+  })
+
+  it('shows both dates when the range spans days', () => {
+    expect(formatRangeLines('2026-07-10T23:00', '2026-07-11T01:00').date).toContain('–')
   })
 })

@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Clock, Building2, User, UsersRound } from 'lucide-react'
+import { PlusIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -30,8 +29,9 @@ import {
 import { ConfirmDelete } from '@/components/shared/ConfirmDelete'
 import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SegmentedControl } from '@/components/shared/SegmentedControl'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { EmptyRow, ErrorRow, LoadErrorBanner, LoadingRow } from '@/components/shared/TableStates'
 import { PaginationControls } from '@/components/shared/PaginationControls'
 import {
   createReservation,
@@ -42,7 +42,7 @@ import {
 import { listAllFacilities } from '@/api/facilities'
 import { listAllUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
-import { calculateDuration, formatRange, fromInputValue, toInputValue } from '@/lib/datetime'
+import { calculateDuration, formatRangeLines, fromInputValue, toInputValue } from '@/lib/datetime'
 import { validateReservation } from '@/lib/validation'
 import type { ReservationFormState } from '@/lib/validation'
 import { PAGE_SIZE, RESERVATION_STATUSES } from '@/types/api'
@@ -177,7 +177,7 @@ export function ReservationsPage() {
           reason: form.reason,
           targetParticipantCount: Number(form.targetParticipantCount),
         })
-        toast.success('Reservation booked successfully.')
+        toast.success('Reservation booked.')
       }
       setDialogOpen(false)
       await load()
@@ -222,273 +222,241 @@ export function ReservationsPage() {
 
   const formDuration = calculateDuration(form.startTime, form.endTime)
 
+  const hasFilters = facilityFilter !== ALL || userFilter !== ALL || statusFilter !== 'ALL'
+  const emptyMessage = hasFilters
+    ? 'No reservations match these filters.'
+    : 'No reservations yet. Use New reservation to book a facility.'
+
+  function renderActions(reservation: ReservationResponse) {
+    return (
+      <>
+        {allowedStatusTransitions(reservation.status).map((target) => (
+          <Button
+            key={target}
+            variant={target === 'Confirmed' ? 'outline' : 'ghost'}
+            size="sm"
+            onClick={() => quickStatusChange(reservation, target)}
+          >
+            {target === 'Confirmed' ? 'Confirm' : 'Cancel'}
+          </Button>
+        ))}
+        <Button variant="ghost" size="sm" onClick={() => openEdit(reservation)}>
+          Edit
+        </Button>
+        <ConfirmDelete
+          description={`This deletes reservation ${reservation.reservationId}.`}
+          onConfirm={() => remove(reservation)}
+        />
+      </>
+    )
+  }
+
   return (
-    <div className="space-y-8">
+    <div>
       <PageHeader
         title="Reservations"
-        description="Schedule campus spaces, track bookings, and oversee occupancy in real-time."
+        description="Book facilities and manage existing bookings."
         action={
-          <Button onClick={openCreate} className="h-8 px-3 text-xs font-semibold shadow-xs">
-            <Plus className="size-3.5 mr-1" /> Book Reservation
+          <Button onClick={openCreate}>
+            <PlusIcon weight="bold" /> New reservation
           </Button>
         }
       />
 
-      {/* Filter and Status Toolbar: Supabase Studio Toolbar */}
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1 rounded-md bg-secondary p-0.5 border border-border">
-            {['ALL', 'Confirmed', 'Pending', 'Cancelled'].map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setStatusFilter(st)}
-                className={`rounded px-2.5 py-1 text-xs font-medium transition-all ${
-                  statusFilter === st
-                    ? 'bg-background text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {st === 'ALL' ? 'All Statuses' : st}
-              </button>
-            ))}
-          </div>
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <SegmentedControl
+          label="Status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'ALL', label: 'All' },
+            ...RESERVATION_STATUSES.map((status) => ({ value: status, label: status })),
+          ]}
+        />
 
-          {/* Select Filters */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                <Building2 className="size-3" /> Facility:
-              </span>
-              <Select value={facilityFilter} onValueChange={setFacilityFilter}>
-                <SelectTrigger className="w-[180px] h-8 text-xs bg-background rounded-md">
-                  <SelectValue placeholder="All facilities" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All facilities</SelectItem>
-                  {facilities.map((f) => (
-                    <SelectItem key={f.id} value={f.facilityId}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={facilityFilter} onValueChange={setFacilityFilter}>
+            <SelectTrigger className="w-48" aria-label="Facility">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All facilities</SelectItem>
+              {facilities.map((f) => (
+                <SelectItem key={f.id} value={f.facilityId}>
+                  {f.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                <User className="size-3" /> Booker:
-              </span>
-              <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-[170px] h-8 text-xs bg-background rounded-md">
-                  <SelectValue placeholder="All users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All users</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.kfupmId}>
-                      {u.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <Select value={userFilter} onValueChange={setUserFilter}>
+            <SelectTrigger className="w-48" aria-label="Booked by">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Anyone</SelectItem>
+              {users.map((u) => (
+                <SelectItem key={u.id} value={u.kfupmId}>
+                  {u.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            {(facilityFilter !== ALL || userFilter !== ALL || statusFilter !== 'ALL') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  setFacilityFilter(ALL)
-                  setUserFilter(ALL)
-                  setStatusFilter('ALL')
-                }}
-              >
-                Reset
-              </Button>
-            )}
-          </div>
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFacilityFilter(ALL)
+                setUserFilter(ALL)
+                setStatusFilter('ALL')
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       </div>
 
-      {loadError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive">
-          {loadError}
-        </div>
-      )}
+      <div className="space-y-6">
+        <LoadErrorBanner message={loadError} />
 
-      {/* Reservations Table */}
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader className="bg-muted/40">
-            <TableRow>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Reference</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Time & Duration</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Facility</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Booker</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Capacity / Reason</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Status</TableHead>
-              <TableHead className="text-right font-medium text-xs text-muted-foreground uppercase font-mono">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loadError ? (
-              <ErrorRow colSpan={7} message={loadError} />
-            ) : filteredReservations === null ? (
-              <LoadingRow colSpan={7} />
+        {!loadError && (
+          <div className="sm:hidden">
+            {filteredReservations === null ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
             ) : filteredReservations.length === 0 ? (
-              <EmptyRow
-                colSpan={7}
-                message={
-                  facilityFilter !== ALL || userFilter !== ALL || statusFilter !== 'ALL'
-                    ? 'No reservations match this filter selection.'
-                    : 'No reservations booked yet — click Book Reservation above.'
-                }
-              />
+              <p className="py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
             ) : (
-              filteredReservations.map((reservation) => {
-                const transitions = allowedStatusTransitions(reservation.status)
-                const durationStr = calculateDuration(reservation.startTime, reservation.endTime)
-
-                return (
-                  <TableRow key={reservation.id} className="hover:bg-muted/30 transition-colors">
-                    {/* Reference ID */}
-                    <TableCell className="font-mono text-xs font-medium text-primary">
-                      {reservation.reservationId}
-                    </TableCell>
-
-                    {/* Time & Duration */}
-                    <TableCell className="whitespace-nowrap text-xs text-foreground">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5 font-mono">
-                          <Clock className="size-3 text-muted-foreground" />
-                          <span>{formatRange(reservation.startTime, reservation.endTime)}</span>
-                        </div>
-                        {durationStr && (
-                          <span className="inline-block font-mono text-[10px] text-muted-foreground bg-secondary border border-border px-1.5 py-0.2 rounded">
-                            {durationStr}
-                          </span>
-                        )}
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {filteredReservations.map((reservation) => {
+                  const when = formatRangeLines(reservation.startTime, reservation.endTime)
+                  return (
+                    <li key={reservation.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-semibold">{reservation.reservationId}</span>
+                        <StatusBadge status={reservation.status} />
                       </div>
-                    </TableCell>
-
-                    {/* Facility */}
-                    <TableCell className="font-medium text-xs text-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="size-3.5 text-muted-foreground shrink-0" />
-                        <span>{reservation.facilityName}</span>
+                      <div className="mt-1 font-medium">{reservation.facilityName}</div>
+                      <div className="text-sm">
+                        {when.date}, {when.time}
                       </div>
-                    </TableCell>
-
-                    {/* Booker */}
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex size-6 items-center justify-center rounded-full bg-secondary border border-border text-[11px] font-medium text-foreground">
-                          {reservation.userName.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-xs text-foreground">
-                          {reservation.userName}
-                        </span>
-                      </div>
-                    </TableCell>
-
-                    {/* Reason & Capacity */}
-                    <TableCell className="max-w-[200px]">
-                      <p className="truncate text-xs text-foreground" title={reservation.reason}>
+                      <div className="mt-1 text-[0.8125rem] text-muted-foreground">
+                        {reservation.userName} · {reservation.targetParticipantCount}{' '}
+                        {reservation.targetParticipantCount === 1 ? 'attendee' : 'attendees'} ·{' '}
                         {reservation.reason}
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <UsersRound className="size-3" />
-                        <span>Target: {reservation.targetParticipantCount} members</span>
                       </div>
-                    </TableCell>
-
-                    {/* Status Badge */}
-                    <TableCell>
-                      <StatusBadge status={reservation.status} />
-                    </TableCell>
-
-                    {/* Transition Actions */}
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {transitions.map((target) => (
-                          <Button
-                            key={target}
-                            variant={target === 'Confirmed' ? 'outline' : 'ghost'}
-                            size="sm"
-                            className={`h-7 px-2 text-xs font-medium ${
-                              target === 'Confirmed'
-                                ? 'text-primary hover:bg-primary/10 border-primary/30'
-                                : 'text-muted-foreground hover:text-destructive'
-                            }`}
-                            onClick={() => quickStatusChange(reservation, target)}
-                          >
-                            {target === 'Confirmed' ? 'Confirm' : 'Cancel'}
-                          </Button>
-                        ))}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => openEdit(reservation)}
-                        >
-                          Edit
-                        </Button>
-                        <ConfirmDelete
-                          description={`Delete reservation ${reservation.reservationId}?`}
-                          onConfirm={() => remove(reservation)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
+                      <div className="mt-2 -ml-3 flex items-center gap-1">{renderActions(reservation)}</div>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
-          </TableBody>
-        </Table>
+          </div>
+        )}
+
+        <div className="hidden overflow-hidden rounded-md border border-border sm:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Reference</TableHead>
+                <TableHead>When</TableHead>
+                <TableHead>Facility</TableHead>
+                <TableHead>Booked by</TableHead>
+                <TableHead>Purpose</TableHead>
+                <TableHead className="text-right">Attendees</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadError ? (
+                <ErrorRow colSpan={8} message={loadError} />
+              ) : filteredReservations === null ? (
+                <LoadingRow colSpan={8} />
+              ) : filteredReservations.length === 0 ? (
+                <EmptyRow colSpan={8} message={emptyMessage} />
+              ) : (
+                filteredReservations.map((reservation) => {
+                  const when = formatRangeLines(reservation.startTime, reservation.endTime)
+                  const duration = calculateDuration(reservation.startTime, reservation.endTime)
+
+                  return (
+                    <TableRow key={reservation.id}>
+                      <TableCell className="font-medium">{reservation.reservationId}</TableCell>
+                      <TableCell>
+                        <div>{when.date}</div>
+                        <div className="text-[0.8125rem] text-muted-foreground">
+                          {when.time}
+                          {duration && ` · ${duration}`}
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-normal min-[1440px]:whitespace-nowrap">
+                        {reservation.facilityName}
+                      </TableCell>
+                      <TableCell className="whitespace-normal min-[1440px]:whitespace-nowrap">
+                        {reservation.userName}
+                      </TableCell>
+                      <TableCell className="max-w-44">
+                        <p className="truncate" title={reservation.reason}>
+                          {reservation.reason}
+                        </p>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {reservation.targetParticipantCount}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={reservation.status} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          {renderActions(reservation)}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <PaginationControls
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={pageMeta.totalCount}
+          totalPages={pageMeta.totalPages}
+          onPageChange={setPage}
+        />
       </div>
 
-      {/* Pagination */}
-      <PaginationControls
-        page={page}
-        pageSize={PAGE_SIZE}
-        totalCount={pageMeta.totalCount}
-        totalPages={pageMeta.totalPages}
-        onPageChange={setPage}
-      />
-
-      {/* Booking Dialog: Supabase Studio Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg rounded-lg">
+        <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-medium tracking-tight">
-              {editing ? `Edit ${editing.reservationId}` : 'Schedule Facility Reservation'}
+            <DialogTitle>
+              {editing ? `Edit reservation ${editing.reservationId}` : 'New reservation'}
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              {editing
-                ? 'Update booking time, expected headcount, or approval status.'
-                : 'Reserve a campus facility with instant database overlap validation.'}
-            </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-2">
+          <div className="grid gap-4">
             {!editing && (
               <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Campus Facility</Label>
+                <div className="grid gap-2">
+                  <Label htmlFor="reservation-facility">Facility</Label>
                   <Select
                     value={form.facilityId}
                     onValueChange={(value) => setForm({ ...form, facilityId: value })}
                   >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select facility" />
+                    <SelectTrigger id="reservation-facility" className="w-full">
+                      <SelectValue placeholder="Choose a facility" />
                     </SelectTrigger>
                     <SelectContent>
                       {facilities.map((facility) => (
                         <SelectItem key={facility.id} value={facility.facilityId}>
-                          {facility.name} ({facility.type})
+                          {facility.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -496,14 +464,14 @@ export function ReservationsPage() {
                   <FieldError message={fieldErrors.facilityId} />
                 </div>
 
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Booker</Label>
+                <div className="grid gap-2">
+                  <Label htmlFor="reservation-user">Booked by</Label>
                   <Select
                     value={form.userId}
                     onValueChange={(value) => setForm({ ...form, userId: value })}
                   >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select member" />
+                    <SelectTrigger id="reservation-user" className="w-full">
+                      <SelectValue placeholder="Choose a person" />
                     </SelectTrigger>
                     <SelectContent>
                       {users.map((user) => (
@@ -519,71 +487,58 @@ export function ReservationsPage() {
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="startTime" className="text-xs font-medium text-muted-foreground">
-                  Start Date & Time
-                </Label>
+              <div className="grid gap-2">
+                <Label htmlFor="startTime">Start</Label>
                 <Input
                   id="startTime"
                   type="datetime-local"
                   value={form.startTime}
                   onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                  className="h-8 text-xs font-mono"
                 />
                 <FieldError message={fieldErrors.startTime} />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="endTime" className="text-xs font-medium text-muted-foreground">
-                  End Date & Time
-                </Label>
+              <div className="grid gap-2">
+                <Label htmlFor="endTime">End</Label>
                 <Input
                   id="endTime"
                   type="datetime-local"
                   value={form.endTime}
                   onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-                  className="h-8 text-xs font-mono"
                 />
                 <FieldError message={fieldErrors.endTime} />
               </div>
             </div>
 
-            {/* Calculated Duration Display */}
             {formDuration && (
-              <div className="flex items-center justify-between rounded-md border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs text-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Clock className="size-3 text-primary" /> Calculated Duration:
-                </span>
-                <span className="font-mono font-semibold text-primary">{formDuration}</span>
-              </div>
+              <p className="-mt-1 text-[0.8125rem] text-muted-foreground">
+                Duration: <span className="font-semibold text-foreground">{formDuration}</span>
+              </p>
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="targetParticipantCount" className="text-xs font-medium text-muted-foreground">
-                  Expected Attendees
-                </Label>
+              <div className="grid gap-2">
+                <Label htmlFor="targetParticipantCount">Expected attendees</Label>
                 <Input
                   id="targetParticipantCount"
                   type="number"
                   min={1}
                   value={form.targetParticipantCount}
                   onChange={(e) => setForm({ ...form, targetParticipantCount: e.target.value })}
-                  className="h-8 text-xs font-mono"
                 />
                 <FieldError message={fieldErrors.targetParticipantCount} />
               </div>
 
               {editing && (
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Status</Label>
+                <div className="grid gap-2">
+                  <Label htmlFor="reservation-status">Status</Label>
                   <Select
                     value={form.status}
                     onValueChange={(value) =>
                       setForm({ ...form, status: value as ReservationStatus })
                     }
                   >
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger id="reservation-status" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -598,28 +553,25 @@ export function ReservationsPage() {
               )}
             </div>
 
-            <div className="grid gap-1.5">
-              <Label htmlFor="reason" className="text-xs font-medium text-muted-foreground">
-                Purpose / Event Description
-              </Label>
+            <div className="grid gap-2">
+              <Label htmlFor="reason">Purpose</Label>
               <Input
                 id="reason"
                 value={form.reason}
                 maxLength={200}
-                placeholder="e.g. Senior Capstone Project Workshop"
+                placeholder="Senior design project meeting"
                 onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                className="h-8 text-xs"
               />
               <FieldError message={fieldErrors.reason} />
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border">
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving} className="h-8 text-xs">
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={saving} className="h-8 text-xs font-semibold">
-              {saving ? 'Validating...' : editing ? 'Save Changes' : 'Confirm Reservation'}
+            <Button onClick={submit} disabled={saving}>
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Book'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, CalendarRange, Building2 } from 'lucide-react'
+import { PlusIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,7 +28,7 @@ import {
 import { ConfirmDelete } from '@/components/shared/ConfirmDelete'
 import { FieldError } from '@/components/shared/FieldError'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { EmptyRow, ErrorRow, LoadErrorBanner, LoadingRow } from '@/components/shared/TableStates'
 import { PaginationControls } from '@/components/shared/PaginationControls'
 import {
   createParticipant,
@@ -39,6 +38,7 @@ import {
 import { listAllReservations } from '@/api/reservations'
 import { listAllUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
+import { humanize } from '@/lib/labels'
 import { PAGE_SIZE } from '@/types/api'
 import type {
   EventParticipantResponse,
@@ -105,7 +105,7 @@ export function ParticipantsPage() {
 
   async function submit() {
     const errors: { userId?: string; reservationId?: string } = {}
-    if (!formUserId) errors.userId = 'Select a campus member.'
+    if (!formUserId) errors.userId = 'Select a person.'
     if (!formReservationId) errors.reservationId = 'Select a reservation.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
@@ -116,7 +116,7 @@ export function ParticipantsPage() {
         userId: formUserId,
         reservationId: formReservationId,
       })
-      toast.success('Participant added to reservation roster.')
+      toast.success('Participant added.')
       setDialogOpen(false)
       await load()
     } catch (error) {
@@ -129,7 +129,7 @@ export function ParticipantsPage() {
   async function remove(participant: EventParticipantResponse) {
     try {
       await deleteParticipant(participant.id)
-      toast.success(`Removed ${participant.userName} from reservation.`)
+      toast.success(`Removed ${participant.userName} from the reservation.`)
       await load()
     } catch (error) {
       toast.error(errorMessage(error))
@@ -139,167 +139,132 @@ export function ParticipantsPage() {
   const selectedReservationObj = reservations.find((r) => r.reservationId === reservationFilter)
 
   return (
-    <div className="space-y-8">
+    <div>
       <PageHeader
-        title="Event Participants"
-        description="Oversee attendee rosters, verify member eligibility, and register participants for campus spaces."
+        title="Participants"
+        description="People attending each reservation."
         action={
-          <Button onClick={openCreate} className="h-8 px-3 text-xs font-semibold shadow-xs">
-            <Plus className="size-3.5 mr-1" /> Add Participant
+          <Button onClick={openCreate}>
+            <PlusIcon weight="bold" /> Add participant
           </Button>
         }
       />
 
-      {/* Filter and Active Reservation Banner: Supabase Studio Toolbar */}
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-              <CalendarRange className="size-3.5" /> Scope Reservation:
-            </span>
-            <Select value={reservationFilter} onValueChange={setReservationFilter}>
-              <SelectTrigger className="w-[300px] h-8 text-xs bg-background rounded-md">
-                <SelectValue placeholder="All reservations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All reservations ({reservations.length})</SelectItem>
-                {reservations.map((r) => (
-                  <SelectItem key={r.id} value={r.reservationId}>
-                    {r.reservationId} — {r.facilityName} ({r.userName})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <Select value={reservationFilter} onValueChange={setReservationFilter}>
+          <SelectTrigger className="w-full max-w-sm" aria-label="Reservation">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All reservations</SelectItem>
+            {reservations.map((r) => (
+              <SelectItem key={r.id} value={r.reservationId}>
+                {r.reservationId}: {r.facilityName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            {reservationFilter !== ALL && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setReservationFilter(ALL)}
-              >
-                Clear Scope
-              </Button>
-            )}
-          </div>
-
-          <div className="text-xs text-muted-foreground font-mono">
-            Roster Entries: <strong className="text-foreground">{pageMeta.totalCount}</strong>
-          </div>
-        </div>
-
-        {selectedReservationObj && (
-          <div className="rounded-md bg-secondary border border-border p-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="font-medium text-foreground flex items-center gap-1.5">
-                <Building2 className="size-3 text-primary" /> {selectedReservationObj.facilityName}
-              </span>
-              <span className="text-muted-foreground">
-                Booked by: <strong className="text-foreground">{selectedReservationObj.userName}</strong>
-              </span>
-            </div>
-            <span className="text-muted-foreground font-mono">
-              Target: {selectedReservationObj.targetParticipantCount} members
-            </span>
-          </div>
+        {reservationFilter !== ALL && (
+          <Button variant="ghost" size="sm" onClick={() => setReservationFilter(ALL)}>
+            Clear filter
+          </Button>
         )}
+
+        <span className="text-sm text-muted-foreground sm:ml-auto">
+          {pageMeta.totalCount} {pageMeta.totalCount === 1 ? 'participant' : 'participants'}
+        </span>
       </div>
 
-      {loadError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive">
-          {loadError}
-        </div>
+      {selectedReservationObj && (
+        <p className="mb-6 text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{selectedReservationObj.facilityName}</span>
+          , booked by {selectedReservationObj.userName} for{' '}
+          {selectedReservationObj.targetParticipantCount}{' '}
+          {selectedReservationObj.targetParticipantCount === 1 ? 'person' : 'people'}.
+        </p>
       )}
 
-      {/* Participants Table */}
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader className="bg-muted/40">
-            <TableRow>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Participant</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">KFUPM ID</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Reservation Ref</TableHead>
-              <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Activity Purpose</TableHead>
-              <TableHead className="w-24 text-right font-medium text-xs text-muted-foreground uppercase font-mono">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loadError ? (
-              <ErrorRow colSpan={5} message={loadError} />
-            ) : participants === null ? (
-              <LoadingRow colSpan={5} />
-            ) : participants.length === 0 ? (
-              <EmptyRow
-                colSpan={5}
-                message={
-                  reservationFilter !== ALL
-                    ? 'No participants registered for this reservation yet.'
-                    : 'No participants recorded across any reservations.'
-                }
-              />
-            ) : (
-              participants.map((p) => (
-                <TableRow key={p.id} className="hover:bg-muted/30 transition-colors">
-                  <TableCell className="font-medium text-xs text-foreground">
-                    <div className="flex items-center gap-2">
-                      <div className="flex size-6 items-center justify-center rounded-full bg-secondary border border-border text-[11px] font-medium text-foreground">
-                        {p.userName.charAt(0).toUpperCase()}
-                      </div>
-                      <span>{p.userName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs font-medium text-primary">
-                    {p.userId}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-foreground">
-                    {p.reservationId}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={p.reservationReason}>
-                    {p.reservationReason}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ConfirmDelete
-                      description={`Remove ${p.userName} from this reservation roster?`}
-                      onConfirm={() => remove(p)}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="space-y-6">
+        <LoadErrorBanner message={loadError} />
+
+        <div className="overflow-hidden rounded-md border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>KFUPM ID</TableHead>
+                <TableHead>Reservation</TableHead>
+                <TableHead>Purpose</TableHead>
+                <TableHead className="w-16">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadError ? (
+                <ErrorRow colSpan={5} message={loadError} />
+              ) : participants === null ? (
+                <LoadingRow colSpan={5} />
+              ) : participants.length === 0 ? (
+                <EmptyRow
+                  colSpan={5}
+                  message={
+                    reservationFilter !== ALL
+                      ? 'Nobody has been added to this reservation yet.'
+                      : 'No participants yet.'
+                  }
+                />
+              ) : (
+                participants.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.userName}</TableCell>
+                    <TableCell>{p.userId}</TableCell>
+                    <TableCell>{p.reservationId}</TableCell>
+                    <TableCell className="max-w-xs">
+                      <p className="truncate text-muted-foreground" title={p.reservationReason}>
+                        {p.reservationReason}
+                      </p>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <ConfirmDelete
+                        description={`This removes ${p.userName} from reservation ${p.reservationId}.`}
+                        onConfirm={() => remove(p)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <PaginationControls
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={pageMeta.totalCount}
+          totalPages={pageMeta.totalPages}
+          onPageChange={setPage}
+        />
       </div>
 
-      {/* Pagination */}
-      <PaginationControls
-        page={page}
-        pageSize={PAGE_SIZE}
-        totalCount={pageMeta.totalCount}
-        totalPages={pageMeta.totalPages}
-        onPageChange={setPage}
-      />
-
-      {/* Add Participant Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-lg">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-medium tracking-tight">Add Event Participant</DialogTitle>
-            <DialogDescription className="text-xs">
-              Enroll a university member into an existing space reservation roster.
-            </DialogDescription>
+            <DialogTitle>Add participant</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Select Campus Member</Label>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="participant-user">Person</Label>
               <Select value={formUserId} onValueChange={setFormUserId}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Choose a member" />
+                <SelectTrigger id="participant-user" className="w-full">
+                  <SelectValue placeholder="Choose a person" />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.kfupmId}>
-                      {user.name} ({user.kfupmId} · {user.role})
+                      {user.name} ({user.kfupmId}, {humanize(user.role)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -307,16 +272,16 @@ export function ParticipantsPage() {
               <FieldError message={fieldErrors.userId} />
             </div>
 
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Target Reservation</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="participant-reservation">Reservation</Label>
               <Select value={formReservationId} onValueChange={setFormReservationId}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Choose reservation" />
+                <SelectTrigger id="participant-reservation" className="w-full">
+                  <SelectValue placeholder="Choose a reservation" />
                 </SelectTrigger>
                 <SelectContent>
                   {reservations.map((reservation) => (
                     <SelectItem key={reservation.id} value={reservation.reservationId}>
-                      {reservation.reservationId} — {reservation.facilityName} ({reservation.userName})
+                      {reservation.reservationId}: {reservation.facilityName} ({reservation.userName})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -325,12 +290,12 @@ export function ParticipantsPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border">
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving} className="h-8 text-xs">
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={saving} className="h-8 text-xs font-semibold">
-              {saving ? 'Adding...' : 'Add to Roster'}
+            <Button onClick={submit} disabled={saving}>
+              {saving ? 'Adding…' : 'Add'}
             </Button>
           </DialogFooter>
         </DialogContent>

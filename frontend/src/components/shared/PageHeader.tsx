@@ -4,27 +4,18 @@ export function PageHeader({
   title,
   description,
   action,
-  badge,
 }: {
   title: string
   description?: string
   action?: ReactNode
-  badge?: ReactNode
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-6">
+    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
-            {title}
-          </h1>
-          {badge}
-        </div>
-        {description && (
-          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
-        )}
+        <h1 className="text-2xl text-brand-ink sm:text-[1.75rem]">{title}</h1>
+        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
-      {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
+      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
     </div>
   )
 }

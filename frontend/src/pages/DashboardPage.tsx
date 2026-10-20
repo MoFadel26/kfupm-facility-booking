@@ -1,16 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Building2,
-  CalendarRange,
-  UserCheck,
-  UsersRound,
-  ArrowRight,
-  Plus,
-  ShieldCheck,
-  CalendarPlus,
-} from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { ArrowRightIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -20,14 +10,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { FacilityIcon } from '@/components/shared/FacilityIcon'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { EmptyRow, ErrorRow, LoadingRow } from '@/components/shared/TableStates'
+import { EmptyRow, ErrorRow, LoadErrorBanner, LoadingRow } from '@/components/shared/TableStates'
 import { listFacilities } from '@/api/facilities'
 import { listParticipants } from '@/api/participants'
 import { listAllReservations, listReservations } from '@/api/reservations'
 import { listUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
-import { formatRange } from '@/lib/datetime'
+import { formatRangeLines } from '@/lib/datetime'
+import { humanize } from '@/lib/labels'
 import type { FacilityResponse, ReservationResponse } from '@/types/api'
 
 interface Stats {
@@ -37,10 +29,25 @@ interface Stats {
   participants: number
 }
 
+function SectionHeading({ title, to, linkLabel }: { title: string; to: string; linkLabel: string }) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between gap-4">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <Link
+        to={to}
+        className="inline-flex items-center gap-1 text-sm font-medium text-brand-ink hover:underline"
+      >
+        {linkLabel}
+        <ArrowRightIcon weight="bold" className="size-3.5" />
+      </Link>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [upcoming, setUpcoming] = useState<ReservationResponse[] | null>(null)
-  const [facilities, setFacilities] = useState<FacilityResponse[]>([])
+  const [facilities, setFacilities] = useState<FacilityResponse[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -71,269 +78,145 @@ export function DashboardPage() {
       .catch((error) => setLoadError(errorMessage(error)))
   }, [])
 
-  const statCards = [
-    {
-      label: 'Campus Facilities',
-      value: stats?.facilities,
-      icon: Building2,
-      to: '/facilities',
-      desc: 'Active labs, classrooms & sports courts',
-    },
-    {
-      label: 'Total Reservations',
-      value: stats?.reservations,
-      icon: CalendarRange,
-      to: '/reservations',
-      desc: 'Scheduled campus activities',
-    },
-    {
-      label: 'Active Participants',
-      value: stats?.participants,
-      icon: UserCheck,
-      to: '/participants',
-      desc: 'Attendees registered for events',
-    },
-    {
-      label: 'Registered Members',
-      value: stats?.users,
-      icon: UsersRound,
-      to: '/users',
-      desc: 'Faculty, staff & student accounts',
-    },
+  const counts = [
+    { one: 'facility', many: 'facilities', value: stats?.facilities, to: '/facilities' },
+    { one: 'reservation', many: 'reservations', value: stats?.reservations, to: '/reservations' },
+    { one: 'participant', many: 'participants', value: stats?.participants, to: '/participants' },
+    { one: 'user', many: 'users', value: stats?.users, to: '/users' },
   ]
 
   return (
-    <div className="space-y-10">
-      {/* Supabase-style Clean Canvas Hero */}
-      <div className="border-b border-border pb-8">
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-2.5 py-0.5 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-primary" />
-              <span>KFUPM Resource Allocation Engine</span>
-            </div>
-            <h1 className="text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
-              Campus Facility Management
-            </h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Book university spaces, check real-time availability, manage attendee rosters, and
-              coordinate events with guaranteed double-booking prevention.
+    <div className="space-y-12">
+      <section className="cut-corner bg-panel px-6 py-8 text-panel-foreground sm:px-10 sm:py-10">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-[1.75rem] leading-tight sm:text-[2rem]">Overview</h1>
+            <p className="mt-2 max-w-xl text-[0.9375rem]">
+              Book rooms, labs and sports facilities across campus.
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Link to="/reservations">
-              <Button className="h-9 px-4 text-xs font-semibold shadow-xs">
-                <Plus className="size-3.5 mr-1.5" /> Book a Space
-              </Button>
-            </Link>
-            <Link to="/facilities">
-              <Button variant="outline" className="h-9 px-4 text-xs font-medium">
-                Browse Facilities
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {loadError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-          {loadError}
-        </div>
-      )}
-
-      {/* Metric Tiles: Supabase Minimalist Cards */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium tracking-tight text-muted-foreground uppercase">
-            System Overview
-          </h2>
-          <span className="text-xs text-muted-foreground font-mono">Live university counts</span>
+          <Button asChild variant="inverse" size="lg" className="self-start md:self-auto">
+            <Link to="/reservations">Book a facility</Link>
+          </Button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((card) => {
-            const Icon = card.icon
-            return (
-              <Link key={card.label} to={card.to} className="group">
-                <Card className="h-full rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {card.label}
-                    </span>
-                    <Icon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <div className="mt-3 font-mono text-3xl font-medium tracking-tight text-foreground">
-                    {card.value ?? '—'}
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">{card.desc}</p>
-                </Card>
+        <ul className="mt-8 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-panel-rule pt-5 text-[0.9375rem] sm:flex sm:flex-wrap sm:gap-x-8">
+          {counts.map((count) => (
+            <li key={count.many}>
+              <Link to={count.to} className="hover:underline">
+                <span className="font-bold tabular-nums">{count.value ?? '–'}</span>{' '}
+                {count.value === 1 ? count.one : count.many}
               </Link>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Featured Spaces */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-medium tracking-tight text-foreground">
-              Featured Campus Spaces
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Classrooms, laboratories, and recreation facilities
-            </p>
-          </div>
-          <Link
-            to="/facilities"
-            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-          >
-            <span>View all facilities</span>
-            <ArrowRight className="size-3" />
-          </Link>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {facilities.slice(0, 3).map((facility) => (
-            <Card
-              key={facility.id}
-              className="flex flex-col justify-between rounded-lg border border-border bg-card p-5 transition-colors hover:border-border/80"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded">
-                    {facility.facilityId}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground uppercase font-mono">
-                    {facility.type}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-base font-medium text-foreground">
-                  {facility.name}
-                </h3>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="rounded border border-border bg-secondary/40 px-2 py-0.5">
-                    Gender: {facility.allowedGender}
-                  </span>
-                  <span className="rounded border border-border bg-secondary/40 px-2 py-0.5">
-                    Role: {facility.allowedRole}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-5 border-t border-border pt-3 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-primary" /> Reservable
-                </span>
-                <Link to={`/reservations?facilityId=${facility.id}`}>
-                  <Button size="sm" variant="outline" className="h-7 text-xs font-medium gap-1">
-                    <CalendarPlus className="size-3" /> Book Now
-                  </Button>
-                </Link>
-              </div>
-            </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
-      {/* Upcoming Schedule Table */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-medium tracking-tight text-foreground">
-              Upcoming Reservations
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Nearest scheduled bookings across the university
-            </p>
-          </div>
-          <Link
-            to="/reservations"
-            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-          >
-            <span>All reservations</span>
-            <ArrowRight className="size-3" />
-          </Link>
-        </div>
+      <LoadErrorBanner message={loadError} />
 
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <section>
+        <SectionHeading title="Upcoming reservations" to="/reservations" linkLabel="All reservations" />
+        {!loadError && upcoming !== null && (
+          <div className="sm:hidden">
+            {upcoming.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No upcoming reservations.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {upcoming.map((res) => {
+                  const when = formatRangeLines(res.startTime, res.endTime)
+                  return (
+                    <li key={res.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium">{res.facilityName}</span>
+                        <StatusBadge status={res.status} />
+                      </div>
+                      <div className="text-sm">
+                        {when.date}, {when.time}
+                      </div>
+                      <div className="text-[0.8125rem] text-muted-foreground">
+                        {res.reservationId} · {res.userName}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div
+          className={
+            !loadError && upcoming !== null
+              ? 'hidden overflow-hidden rounded-md border border-border sm:block'
+              : 'overflow-hidden rounded-md border border-border'
+          }
+        >
           <Table>
-            <TableHeader className="bg-muted/40">
+            <TableHeader>
               <TableRow>
-                <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Reference</TableHead>
-                <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Schedule</TableHead>
-                <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Facility</TableHead>
-                <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Booker</TableHead>
-                <TableHead className="font-medium text-xs text-muted-foreground uppercase font-mono">Status</TableHead>
-                <TableHead className="w-24 text-right font-medium text-xs text-muted-foreground uppercase font-mono">Action</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead>When</TableHead>
+                <TableHead>Facility</TableHead>
+                <TableHead>Booked by</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadError ? (
-                <ErrorRow colSpan={6} message={loadError} />
+                <ErrorRow colSpan={5} message={loadError} />
               ) : upcoming === null ? (
-                <LoadingRow colSpan={6} />
+                <LoadingRow colSpan={5} />
               ) : upcoming.length === 0 ? (
-                <EmptyRow colSpan={6} message="No upcoming reservations scheduled." />
+                <EmptyRow colSpan={5} message="No upcoming reservations." />
               ) : (
-                upcoming.map((res) => (
-                  <TableRow key={res.id} className="hover:bg-muted/30 transition-colors">
-                    <TableCell className="font-mono text-xs font-medium text-foreground">
-                      {res.reservationId}
-                    </TableCell>
-                    <TableCell className="text-xs text-foreground font-mono">
-                      {formatRange(res.startTime, res.endTime)}
-                    </TableCell>
-                    <TableCell className="font-medium text-xs text-foreground">
-                      {res.facilityName}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {res.userName}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={res.status} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link to="/reservations">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs font-medium text-muted-foreground hover:text-foreground">
-                          Details
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
+                upcoming.map((res) => {
+                  const when = formatRangeLines(res.startTime, res.endTime)
+                  return (
+                    <TableRow key={res.id}>
+                      <TableCell className="font-medium">{res.reservationId}</TableCell>
+                      <TableCell>
+                        {when.date}, {when.time}
+                      </TableCell>
+                      <TableCell>{res.facilityName}</TableCell>
+                      <TableCell>{res.userName}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={res.status} />
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
         </div>
       </section>
 
-      {/* Integrity & Postgres Guarantee Card */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary border border-border text-primary">
-              <ShieldCheck className="size-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-foreground">
-                KFUPM Reservation Integrity
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground max-w-xl leading-relaxed">
-                Every reservation is enforced by backend PostgreSQL constraint locks to guarantee zero
-                double bookings. Facility rules (role prerequisites and gender allocations) apply to both
-                bookers and invited participants.
-              </p>
-            </div>
-          </div>
-          <Link to="/facilities">
-            <Button variant="outline" size="sm" className="text-xs shrink-0 font-medium">
-              Inspect Facilities
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <section>
+        <SectionHeading title="Facilities" to="/facilities" linkLabel="All facilities" />
+        {facilities === null ? (
+          !loadError && <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : facilities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No facilities yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {facilities.map((facility) => (
+              <li key={facility.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+                <FacilityIcon type={facility.type} className="size-5 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">{facility.name}</div>
+                  <div className="text-[0.8125rem] text-muted-foreground">
+                    {facility.facilityId} · {humanize(facility.type)}
+                  </div>
+                </div>
+                <div className="text-[0.8125rem] text-muted-foreground">
+                  {facility.allowedRole === 'Any' ? 'Any role' : humanize(facility.allowedRole)} ·{' '}
+                  {facility.allowedGender === 'Any' ? 'Any gender' : facility.allowedGender}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }
