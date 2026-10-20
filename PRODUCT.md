@@ -22,14 +22,18 @@ Daily university life across desktop and mobile devices: campus members booking 
 - Concurrency-safe reservation engine preventing any overlapping active bookings for the same space.
 - Access rules enforced at facility and participant levels: capacity limits, role constraints (Student, Faculty, Staff, Admin), and gender requirements.
 - Full participant lifecycle tracking with deduplication guards.
-- Status management: Pending, Confirmed, Cancelled, Completed.
-- React 19 frontend with Tailwind CSS 4, Lucide icons, and modern UI primitives.
+- Status management: Pending, Confirmed, Cancelled.
+- React 19 frontend with Tailwind CSS 4, Phosphor icons, and shadcn/Radix UI primitives.
 
 ## Brand Commitments
-- **Name**: KFUPM Facility Booking / Resource Manager
-- **Identity**: Modern Academic Tech—prestigious, clean, architectural, and forward-looking.
-- **Palette**: Signature KFUPM green accents (`#006C35` / modern emerald OKLCH tones), crisp slate backgrounds, airy cards, and refined typography.
-- **Anti-Reference**: Discard the drab "institutional ledger" aesthetic (dark green walls, ruled notebook lines, heavy serif headers, and cramped data tables).
+- **Name**: KFUPM Facility Booking
+- **Authority**: KFUPM Identity Guideline v3 (Public Relations and Communications, November 2022). It overrides any other visual preference.
+- **Palette**: KFUPM Green `#008540`, Forest `#00573F`, Gold `#DAC961`, Stone `#AA8A00`, Petrol `#003E51`, Light Gray `#D9DAE4`, Dark Gray `#373938`.
+- **Typography**: Poppins only. Titles bold, text regular.
+- **Elements**: octagon cut corners used sparingly; the gold-green brand gradient only as a thin bar; filled icons.
+- **Logo**: none in the app. The name is set as text.
+- **Copy**: plain labels. No tech-marketing badges, banners, or claims about the database.
+- **Anti-Reference**: generic SaaS dashboards (Supabase-style emerald on near-black, mono labels, pill badges, status dots) and the drab "institutional ledger" (ruled lines, heavy serif headers, cramped tables).
 
 ## Product Principles
 1. **Clarity Over Bureaucracy**: Surface availability, limits, and schedules through clean visual cards, badges, and intuitive indicators rather than dense text dumps.
