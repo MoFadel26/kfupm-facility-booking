@@ -28,3 +28,20 @@ export function formatRange(startIso: string, endIso: string): string {
   const sameDay = start.toDateString() === end.toDateString()
   return `${dateTimeFormat.format(start)} – ${sameDay ? timeFormat.format(end) : dateTimeFormat.format(end)}`
 }
+
+/** "2 hr 30 min" between two dates, or null when the range is empty or invalid. */
+export function calculateDuration(start: string, end: string): string | null {
+  if (!start || !end) return null
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const diffMs = endDate.getTime() - startDate.getTime()
+  if (diffMs <= 0 || isNaN(diffMs)) return null
+
+  const diffMinutes = Math.floor(diffMs / 60000)
+  const hours = Math.floor(diffMinutes / 60)
+  const mins = diffMinutes % 60
+
+  if (hours > 0 && mins > 0) return `${hours} hr ${mins} min`
+  if (hours > 0) return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`
+  return `${mins} min`
+}

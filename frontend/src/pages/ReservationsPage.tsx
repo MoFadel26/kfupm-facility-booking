@@ -42,7 +42,9 @@ import {
 import { listAllFacilities } from '@/api/facilities'
 import { listAllUsers } from '@/api/users'
 import { errorMessage } from '@/api/client'
-import { formatRange, fromInputValue, toInputValue } from '@/lib/datetime'
+import { calculateDuration, formatRange, fromInputValue, toInputValue } from '@/lib/datetime'
+import { validateReservation } from '@/lib/validation'
+import type { ReservationFormState } from '@/lib/validation'
 import { PAGE_SIZE, RESERVATION_STATUSES } from '@/types/api'
 import type {
   FacilityResponse,
@@ -53,17 +55,7 @@ import type {
 
 const ALL = 'all'
 
-interface FormState {
-  startTime: string
-  endTime: string
-  reason: string
-  targetParticipantCount: string
-  facilityId: string
-  userId: string
-  status: ReservationStatus
-}
-
-const EMPTY_FORM: FormState = {
+const EMPTY_FORM: ReservationFormState = {
   startTime: '',
   endTime: '',
   reason: '',
@@ -71,40 +63,6 @@ const EMPTY_FORM: FormState = {
   facilityId: '',
   userId: '',
   status: 'Pending',
-}
-
-function calculateDuration(start: string, end: string): string | null {
-  if (!start || !end) return null
-  const startDate = new Date(start)
-  const endDate = new Date(end)
-  const diffMs = endDate.getTime() - startDate.getTime()
-  if (diffMs <= 0 || isNaN(diffMs)) return null
-
-  const diffMinutes = Math.floor(diffMs / 60000)
-  const hours = Math.floor(diffMinutes / 60)
-  const mins = diffMinutes % 60
-
-  if (hours > 0 && mins > 0) return `${hours} hr ${mins} min`
-  if (hours > 0) return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`
-  return `${mins} min`
-}
-
-function validate(form: FormState, isEdit: boolean): Partial<Record<keyof FormState, string>> {
-  const errors: Partial<Record<keyof FormState, string>> = {}
-  if (!isEdit && !form.facilityId) errors.facilityId = 'Select a facility.'
-  if (!isEdit && !form.userId) errors.userId = 'Select a user.'
-  if (!form.startTime) errors.startTime = 'Start time is required.'
-  if (!form.endTime) errors.endTime = 'End time is required.'
-  if (form.startTime && form.endTime && form.startTime >= form.endTime) {
-    errors.endTime = 'End time must be after start time.'
-  }
-  const count = Number(form.targetParticipantCount)
-  if (!form.targetParticipantCount || isNaN(count) || count < 1) {
-    errors.targetParticipantCount = 'Must be at least 1.'
-  }
-  if (!form.reason.trim()) errors.reason = 'Reason is required.'
-  else if (form.reason.length > 200) errors.reason = 'At most 200 characters.'
-  return errors
 }
 
 function allowedStatusTransitions(current: ReservationStatus): ReservationStatus[] {
@@ -132,8 +90,8 @@ export function ReservationsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ReservationResponse | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({})
+  const [form, setForm] = useState<ReservationFormState>(EMPTY_FORM)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ReservationFormState, string>>>({})
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -195,7 +153,7 @@ export function ReservationsPage() {
   }
 
   async function submit() {
-    const errors = validate(form, editing !== null)
+    const errors = validateReservation(form, editing !== null)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 

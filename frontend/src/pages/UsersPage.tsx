@@ -37,6 +37,7 @@ import { createUser, deleteUser, listUsers, updateUser } from '@/api/users'
 import { errorMessage } from '@/api/client'
 import { GENDERS, PAGE_SIZE, USER_ROLES } from '@/types/api'
 import type { Gender, UserRequest, UserResponse, UserRole } from '@/types/api'
+import { validateUser } from '@/lib/validation'
 
 const EMPTY_FORM: UserRequest = {
   kfupmId: '',
@@ -58,18 +59,6 @@ function getRoleBadge(role: UserRole) {
     default:
       return 'border-border bg-secondary/70 text-muted-foreground'
   }
-}
-
-function validate(form: UserRequest): Partial<Record<keyof UserRequest, string>> {
-  const errors: Partial<Record<keyof UserRequest, string>> = {}
-  if (!form.kfupmId.trim()) errors.kfupmId = 'KFUPM ID is required.'
-  else if (form.kfupmId.length > 20) errors.kfupmId = 'At most 20 characters.'
-  if (!form.name.trim()) errors.name = 'Name is required.'
-  else if (form.name.length > 100) errors.name = 'At most 100 characters.'
-  if (!form.email.trim()) errors.email = 'Email is required.'
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email.'
-  else if (form.email.length > 150) errors.email = 'At most 150 characters.'
-  return errors
 }
 
 export function UsersPage() {
@@ -132,7 +121,7 @@ export function UsersPage() {
   }
 
   async function submit() {
-    const errors = validate(form)
+    const errors = validateUser(form)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
