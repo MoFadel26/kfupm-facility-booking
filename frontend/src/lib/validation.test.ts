@@ -121,7 +121,7 @@ describe('validateReservation', () => {
   })
 
   it('requires a reason of at most 200 characters', () => {
-    expect(validateReservation({ ...valid, reason: '   ' }, false).reason).toBe('Reason is required.')
+    expect(validateReservation({ ...valid, reason: '   ' }, false).reason).toBe('Enter the purpose of the booking.')
     expect(validateReservation({ ...valid, reason: 'x'.repeat(201) }, false).reason).toBe('At most 200 characters.')
     expect(validateReservation({ ...valid, reason: 'x'.repeat(200) }, false)).toEqual({})
   })

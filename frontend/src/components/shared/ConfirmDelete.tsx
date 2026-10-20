@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { TrashIcon } from '@phosphor-icons/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,20 +26,20 @@ export function ConfirmDelete({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Delete" className="text-destructive hover:text-destructive">
-          <Trash2 className="size-4" />
+        <Button variant="ghost" size="icon-sm" aria-label="Delete" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+          <TrashIcon weight="fill" className="size-4" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Delete this record?</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={busy}
-            className="bg-destructive text-white hover:bg-destructive/90"
+            className="bg-destructive text-white hover:bg-destructive/90 dark:text-[#0f1b1f]"
             onClick={async (event) => {
               event.preventDefault()
               setBusy(true)

@@ -44,7 +44,7 @@ export function validateReservation(form: ReservationFormState, isEdit: boolean)
   if (!form.targetParticipantCount || isNaN(count) || count < 1) {
     errors.targetParticipantCount = 'Must be at least 1.'
   }
-  if (!form.reason.trim()) errors.reason = 'Reason is required.'
+  if (!form.reason.trim()) errors.reason = 'Enter the purpose of the booking.'
   else if (form.reason.length > 200) errors.reason = 'At most 200 characters.'
   return errors
 }

@@ -17,16 +17,21 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' })
 
+const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
+
 export function formatDateTime(iso: string): string {
   return dateTimeFormat.format(new Date(iso))
 }
 
-/** "Jul 10, 2026, 10:00 AM – 12:00 PM" (end date shown only when it differs). */
-export function formatRange(startIso: string, endIso: string): string {
+/** The range split for two-line display: date(s) on one line, times on the next. */
+export function formatRangeLines(startIso: string, endIso: string): { date: string; time: string } {
   const start = new Date(startIso)
   const end = new Date(endIso)
   const sameDay = start.toDateString() === end.toDateString()
-  return `${dateTimeFormat.format(start)} – ${sameDay ? timeFormat.format(end) : dateTimeFormat.format(end)}`
+  return {
+    date: sameDay ? dateFormat.format(start) : `${dateFormat.format(start)} – ${dateFormat.format(end)}`,
+    time: `${timeFormat.format(start)} – ${timeFormat.format(end)}`,
+  }
 }
 
 /** "2 hr 30 min" between two dates, or null when the range is empty or invalid. */
