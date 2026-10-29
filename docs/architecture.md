@@ -1,10 +1,7 @@
 # Architecture & decisions
 
-Why this codebase is the way it is. Written to be defended out loud: each decision
-carries the alternative it beat and what it costs.
-
-Read this *after* trying to answer the questions yourself — it is much easier to
-recognise a good answer than to produce one, and an interview asks you to produce one.
+Why this codebase is the way it is. Each decision carries the alternative it beat
+and what it costs.
 
 ---
 
@@ -150,7 +147,7 @@ page, because the database still walks the skipped rows — irrelevant at thousa
 rows, and it buys the ability to jump to page 5, which keyset cursors cannot do. At
 millions of rows, or an infinite scroll, keyset would be the right call.
 
-**The subtlety worth knowing.** Offset paging is only correct if the sort key is
+**The sort key must be unique.** Offset paging is only correct if the sort key is
 *unique*. Order users by name alone and rows with equal names have no defined order, so
 the database may return them differently between two queries — a row appears on both
 pages, or on neither. Hence `.OrderBy(u => u.Name).ThenBy(u => u.Id)` everywhere. There
@@ -243,7 +240,7 @@ exists in `pg_constraint`.
 
 ---
 
-## What is missing, and what you would do next
+## What is missing
 
 - **No authentication.** The largest gap, and the sharpest edge is not that writes are
   open: `CreateReservationRequest.UserId` comes from the request body, so a caller can
