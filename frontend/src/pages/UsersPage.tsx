@@ -35,6 +35,7 @@ import { EmptyRow, ErrorRow, LoadErrorBanner, LoadingRow } from '@/components/sh
 import { PaginationControls } from '@/components/shared/PaginationControls'
 import { createUser, deleteUser, listUsers, updateUser } from '@/api/users'
 import { errorMessage } from '@/api/client'
+import { useAuth } from '@/auth/useAuth'
 import { humanize } from '@/lib/labels'
 import { GENDERS, PAGE_SIZE, USER_ROLES } from '@/types/api'
 import type { Gender, UserRequest, UserResponse, UserRole } from '@/types/api'
@@ -57,6 +58,7 @@ const ROLE_STYLES: Record<UserRole, string> = {
 }
 
 export function UsersPage() {
+  const { isAdmin } = useAuth()
   const [users, setUsers] = useState<UserResponse[] | null>(null)
   const [page, setPage] = useState(1)
   const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
@@ -160,15 +162,19 @@ export function UsersPage() {
     })
   }, [users, searchQuery, roleFilter])
 
+  const columnCount = isAdmin ? 6 : 5
+
   return (
     <div>
       <PageHeader
         title="Users"
         description="Students, faculty and staff who can book facilities."
         action={
-          <Button onClick={openCreate}>
-            <PlusIcon weight="bold" /> Add user
-          </Button>
+          isAdmin && (
+            <Button onClick={openCreate}>
+              <PlusIcon weight="bold" /> Add user
+            </Button>
+          )
         }
       />
 
@@ -210,18 +216,20 @@ export function UsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Gender</TableHead>
-                <TableHead className="w-28">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                {isAdmin && (
+                  <TableHead className="w-28">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadError ? (
-                <ErrorRow colSpan={6} message={loadError} />
+                <ErrorRow colSpan={columnCount} message={loadError} />
               ) : filteredUsers === null ? (
-                <LoadingRow colSpan={6} />
+                <LoadingRow colSpan={columnCount} />
               ) : filteredUsers.length === 0 ? (
-                <EmptyRow colSpan={6} message="No users found." />
+                <EmptyRow colSpan={columnCount} message="No users found." />
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id}>
@@ -234,17 +242,19 @@ export function UsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{user.gender}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
-                          Edit
-                        </Button>
-                        <ConfirmDelete
-                          description={`This deletes ${user.name} (${user.kfupmId}). Users with reservations or participant records cannot be deleted.`}
-                          onConfirm={() => remove(user)}
-                        />
-                      </div>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
+                            Edit
+                          </Button>
+                          <ConfirmDelete
+                            description={`This deletes ${user.name} (${user.kfupmId}). Users with reservations or participant records cannot be deleted.`}
+                            onConfirm={() => remove(user)}
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
