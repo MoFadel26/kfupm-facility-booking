@@ -92,6 +92,35 @@ Configure the API with environment variables:
 
 Health checks: `GET /health/live` (process is up) and `GET /health/ready` (database is reachable).
 
+## Performance
+
+`POST /api/reservations` under [k6](https://k6.io), 100 virtual users sending requests
+back to back for 60 seconds ([perf/create-reservation.js](perf/create-reservation.js)).
+Every request books a free slot, so each one runs the eligibility checks, the overlap
+query and the insert.
+
+| Run | p95 | Median | Requests/s | Failed |
+| --- | --- | --- | --- | --- |
+| 1 | 268.6 ms | 69.6 ms | 1,085 | 6 of 65,251 |
+| 2 | 272.8 ms | 60.2 ms | 1,166 | 5 of 70,116 |
+| 3 | 291.1 ms | 66.2 ms | 1,019 | 4 of 61,355 |
+
+Measured on 2026-10-29 on one Apple M1 Pro (10 cores, 16 GB): the API as a Release build
+with `ASPNETCORE_ENVIRONMENT=Production`, PostgreSQL 18 in a Docker container, and k6 on
+the same machine. A warm-up run came first. The database kept the rows from earlier runs,
+about 150,000 reservations at the start of run 1. These are numbers for this machine, not
+for a deployment.
+
+The failures are `409`s from the unique index on `ReservationId`. It is `RES-` plus 8 hex
+digits, 32 random bits, so two bookings start drawing the same id once the table holds
+a few hundred thousand rows.
+
+To repeat it, start the API on port 5080 with a signing key, then:
+
+```bash
+k6 run -e BASE_URL=http://localhost:5080 -e TOKEN=<token whose sub is 209900001> perf/create-reservation.js
+```
+
 ## More
 
 - [docs/architecture.md](docs/architecture.md): design decisions and trade-offs
