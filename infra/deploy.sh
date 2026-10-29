@@ -12,15 +12,17 @@
 #   CORS_ORIGIN        the origin the frontend is served from, e.g.
 #                      https://example.com. Production refuses to start
 #                      without one.
-#   JWT_ISSUER         the issuer the API expects in access tokens. Also the
-#                      issuer of the signing key.
-#   JWT_AUDIENCE       the audience the API expects in access tokens.
+#   JWT_ISSUER         the issuer the API puts in the tokens it issues and
+#                      expects in access tokens. Also the issuer of the
+#                      signing key.
+#   JWT_AUDIENCE       the audience the API puts in its tokens and expects.
 #   JWT_SIGNING_KEY    base64, 32 or more bytes (openssl rand -base64 48).
-#                      Checks the signature of access tokens. Stored as a
-#                      Container Apps secret.
+#                      Signs and checks access tokens. Stored as a Container
+#                      Apps secret.
 #   SEED_SAMPLE_DATA   optional; true seeds the sample facilities and users.
 #   API_DOCS           optional; true serves the OpenAPI document and the
 #                      Scalar docs.
+#   ADMIN_KFUPM_ID     optional; the KFUPM id that registers as an admin.
 #
 # The configuration below replaces the app's secrets and environment on every
 # run, so pass the optional values on every run once set: a run without them
@@ -55,6 +57,7 @@ if ! [[ "$JWT_SIGNING_KEY" =~ ^[A-Za-z0-9+/]{43,}={0,2}$ ]]; then
 fi
 SEED_SAMPLE_DATA="${SEED_SAMPLE_DATA:-}"
 API_DOCS="${API_DOCS:-}"
+ADMIN_KFUPM_ID="${ADMIN_KFUPM_ID:-}"
 
 echo "-- CLI extension and resource providers"
 az extension add --name containerapp --upgrade --only-show-errors
@@ -140,6 +143,13 @@ if [ -n "$API_DOCS" ]; then
             value: \"$API_DOCS\""
 fi
 
+admin_env=""
+if [ -n "$ADMIN_KFUPM_ID" ]; then
+  admin_env="
+          - name: Bootstrap__AdminKfupmId
+            value: \"$ADMIN_KFUPM_ID\""
+fi
+
 # The spec holds the connection string and the signing key, so it is private
 # and deleted on exit.
 spec=$(mktemp)
@@ -196,7 +206,7 @@ properties:
           - name: Authentication__Schemes__Bearer__SigningKeys__0__Issuer
             value: "$JWT_ISSUER"
           - name: Authentication__Schemes__Bearer__SigningKeys__0__Value
-            secretRef: jwt-signing-key$seed_env$docs_env
+            secretRef: jwt-signing-key$seed_env$docs_env$admin_env
         probes:
           - type: Startup
             httpGet:

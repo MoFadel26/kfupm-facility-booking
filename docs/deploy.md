@@ -38,12 +38,13 @@ is in `appsettings*.json` or in the image.
 |---|---|---|
 | `ConnectionStrings__DefaultConnection` | `infra/deploy.sh`, as the Container Apps secret `db-connection` | Npgsql connection string with `SSL Mode=VerifyFull` |
 | `Cors__AllowedOrigins__0` | `infra/deploy.sh`, from `CORS_ORIGIN` | The frontend's origin. Production refuses to start without one |
-| `Authentication__Schemes__Bearer__ValidIssuer` | `infra/deploy.sh`, from `JWT_ISSUER` | Issuer the API expects in access tokens |
-| `Authentication__Schemes__Bearer__ValidAudiences__0` | `infra/deploy.sh`, from `JWT_AUDIENCE` | Audience the API expects in access tokens |
+| `Authentication__Schemes__Bearer__ValidIssuer` | `infra/deploy.sh`, from `JWT_ISSUER` | Issuer the API puts in the tokens it issues and expects in access tokens. Production refuses to start without one |
+| `Authentication__Schemes__Bearer__ValidAudiences__0` | `infra/deploy.sh`, from `JWT_AUDIENCE` | Audience the API puts in its tokens and expects. Production refuses to start without one |
 | `Authentication__Schemes__Bearer__SigningKeys__0__Issuer` | `infra/deploy.sh`, from `JWT_ISSUER` | Issuer the signing key belongs to |
-| `Authentication__Schemes__Bearer__SigningKeys__0__Value` | `infra/deploy.sh`, from `JWT_SIGNING_KEY`, as the Container Apps secret `jwt-signing-key` | Base64, 32 or more bytes. Checks the signature of access tokens |
+| `Authentication__Schemes__Bearer__SigningKeys__0__Value` | `infra/deploy.sh`, from `JWT_SIGNING_KEY`, as the Container Apps secret `jwt-signing-key` | Base64, 32 or more bytes. Signs and checks access tokens. Production refuses to start without one |
 | `Database__SeedSampleData` | `infra/deploy.sh`, from `SEED_SAMPLE_DATA`, only if set | `true` seeds the sample facilities and users. Default `false` |
 | `ApiDocs__Enabled` | `infra/deploy.sh`, from `API_DOCS`, only if set | `true` serves the OpenAPI document and the Scalar docs. Default `false` |
+| `Bootstrap__AdminKfupmId` | `infra/deploy.sh`, from `ADMIN_KFUPM_ID`, only if set | The KFUPM id that registers as an admin. Without it, nobody can become an admin |
 | `Database__MigrateOnStartup` | not set; default `true` | Applies pending migrations before the app starts |
 | `ASPNETCORE_HTTP_PORTS` | `Dockerfile` | `8080` |
 | `ASPNETCORE_ENVIRONMENT` | .NET image default | `Production` |
@@ -67,6 +68,7 @@ to HTTPS at the edge.
 | `JWT_SIGNING_KEY` | always | Base64, 32 or more bytes (`openssl rand -base64 48`). Use the same value on every run, or tokens signed with the old key stop working |
 | `SEED_SAMPLE_DATA` | no, but pass it on every run once set | Becomes `Database__SeedSampleData`. A run without it turns it off |
 | `API_DOCS` | no, but pass it on every run once set | Becomes `ApiDocs__Enabled`. A run without it turns it off |
+| `ADMIN_KFUPM_ID` | no, but pass it on every run once set | Becomes `Bootstrap__AdminKfupmId`. A run without it turns it off |
 
 The script replaces the app's secrets and environment on every run, which is
 why the optional values have to be passed again.
@@ -141,6 +143,7 @@ Needs the Azure CLI and the GitHub CLI, both signed in.
    export JWT_AUDIENCE=<audience>
    export SEED_SAMPLE_DATA=true   # optional
    export API_DOCS=true           # optional
+   export ADMIN_KFUPM_ID=<KFUPM id>   # optional; registers as an admin
    infra/deploy.sh
    ```
 
