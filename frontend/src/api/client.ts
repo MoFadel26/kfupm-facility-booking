@@ -1,3 +1,5 @@
+import { clearStoredAuth, getStoredAuth } from '@/lib/authStorage'
+
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5049'
 
 /** RFC 7807 error thrown for any non-2xx response. `fieldErrors` carries
@@ -15,15 +17,20 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (options.body) headers['Content-Type'] = 'application/json'
+  const token = getStoredAuth()?.token
+  if (token) headers.Authorization = `Bearer ${token}`
+
   let response: Response
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
-      headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
-      ...options,
-    })
+    response = await fetch(`${BASE_URL}${path}`, { headers, ...options })
   } catch {
     throw new ApiError(0, 'Cannot reach the API — is the backend running?')
   }
+
+  // The token is missing, expired or revoked: drop it so the UI shows the user as logged out.
+  if (response.status === 401) clearStoredAuth()
 
   if (response.status === 204) return undefined as T
   if (response.ok) return (await response.json()) as T

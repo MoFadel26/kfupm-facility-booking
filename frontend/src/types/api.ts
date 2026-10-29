@@ -71,6 +71,28 @@ export interface UserResponse extends UserRequest {
   id: string
 }
 
+// ---------- Auth ----------
+
+export interface LoginRequest {
+  kfupmId: string
+  password: string
+}
+
+export interface RegisterRequest {
+  kfupmId: string
+  name: string
+  email: string
+  gender: Gender
+  password: string
+}
+
+export interface AuthResponse {
+  token: string
+  /** ISO-8601. */
+  expiresAt: string
+  user: UserResponse
+}
+
 // ---------- Facilities ----------
 
 export interface FacilityRequest {

@@ -3,3 +3,5 @@ import { cleanup } from '@testing-library/react'
 
 // Vitest globals are off, so Testing Library cannot register its own cleanup.
 afterEach(cleanup)
+// Each test starts logged out.
+afterEach(() => localStorage.clear())
