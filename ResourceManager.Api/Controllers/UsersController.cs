@@ -36,7 +36,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserResponse>> Create(UserRequest request, CancellationToken ct)
+    public async Task<ActionResult<UserResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         var user = await _userService.CreateAsync(request, ct);
         return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
@@ -63,6 +63,20 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _userService.DeleteAsync(id, ct);
+        return NoContent();
+    }
+
+    /// <summary>Sets or resets a user's password. Existing tokens stay valid until they expire.</summary>
+    [HttpPut("{id:guid}/password")]
+    [Authorize(Policy = AdminRequirement.PolicyName)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetPassword(Guid id, SetPasswordRequest request, CancellationToken ct)
+    {
+        await _userService.SetPasswordAsync(id, request, ct);
         return NoContent();
     }
 }

@@ -47,13 +47,14 @@ public class RequestValidationTests : ApiTestBase
     [InlineData("Name", "not-an-email")] // malformed email
     public async Task A_user_needs_a_name_and_a_valid_email(string name, string email)
     {
-        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new CreateUserRequest
         {
             KfupmId = "202300055",
             Name = name,
             Email = email,
             Role = UserRole.Student,
-            Gender = Gender.Male
+            Gender = Gender.Male,
+            Password = UserPassword
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -78,13 +79,14 @@ public class RequestValidationTests : ApiTestBase
     [Fact]
     public async Task A_user_needs_a_kfupm_id()
     {
-        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new CreateUserRequest
         {
             KfupmId = "",
             Name = "Name",
             Email = "a@kfupm.edu.sa",
             Role = UserRole.Student,
-            Gender = Gender.Male
+            Gender = Gender.Male,
+            Password = UserPassword
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

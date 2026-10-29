@@ -45,18 +45,22 @@ public abstract class ApiTestBase : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<FacilityResponse>(ApiFixture.Json))!;
     }
 
+    /// <summary>The password <see cref="CreateUserAsync"/> gives every user.</summary>
+    protected const string UserPassword = "user-password-1";
+
     protected async Task<UserResponse> CreateUserAsync(
         string kfupmId = "202300001",
         UserRole role = UserRole.Student,
         Gender gender = Gender.Male)
     {
-        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new CreateUserRequest
         {
             KfupmId = kfupmId,
             Name = $"User {kfupmId}",
             Email = $"s{kfupmId}@kfupm.edu.sa",
             Role = role,
-            Gender = gender
+            Gender = gender,
+            Password = UserPassword
         });
 
         response.EnsureSuccessStatusCode();

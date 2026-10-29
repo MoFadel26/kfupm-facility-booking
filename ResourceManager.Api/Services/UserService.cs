@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ResourceManager.Api.Data;
 using ResourceManager.Api.DTO;
@@ -9,10 +10,12 @@ namespace ResourceManager.Api.Services;
 public class UserService : IUserService
 {
     private readonly AppDbContext _db;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
-    public UserService(AppDbContext db)
+    public UserService(AppDbContext db, IPasswordHasher<User> passwordHasher)
     {
         _db = db;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<PagedResult<UserResponse>> GetAllAsync(PageQuery query, CancellationToken ct = default)
@@ -33,11 +36,12 @@ public class UserService : IUserService
             ?? throw new NotFoundException(nameof(User), id);
     }
 
-    public async Task<UserResponse> CreateAsync(UserRequest request, CancellationToken ct = default)
+    public async Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
         await EnsureUniqueAsync(_db, request.KfupmId, request.Email, excludeId: null, ct);
 
         var user = new User(request.KfupmId.Trim(), request.Name.Trim(), request.Email.Trim(), request.Role, request.Gender);
+        user.SetPasswordHash(_passwordHasher.HashPassword(user, request.Password));
         _db.Users.Add(user);
         await _db.SaveChangesAsync(ct);
         return user.ToResponse();
@@ -75,6 +79,19 @@ public class UserService : IUserService
             throw new ConflictException("Cannot delete a user who participates in events. Remove their participations first.");
 
         _db.Users.Remove(user);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Sets or replaces the password. This is how a user from before passwords existed, or
+    /// one who forgot theirs, gets back in: an admin sets one and tells them.
+    /// </summary>
+    public async Task SetPasswordAsync(Guid id, SetPasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
+                   ?? throw new NotFoundException(nameof(User), id);
+
+        user.SetPasswordHash(_passwordHasher.HashPassword(user, request.Password));
         await _db.SaveChangesAsync(ct);
     }
 

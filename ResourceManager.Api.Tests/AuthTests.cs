@@ -131,7 +131,11 @@ public class AuthTests : ApiTestBase
     public async Task Every_failed_login_gets_the_same_401()
     {
         (await RegisterAsync(Student)).EnsureSuccessStatusCode();
-        await CreateUserAsync("202300002"); // created by an admin, so no password
+        // A user from before passwords existed.
+        await CreateUserAsync("202300002");
+        await Fixture.QueryAsync(db => db.Users
+            .Where(u => u.KfupmId == "202300002")
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.PasswordHash, (string?)null)));
 
         var responses = new[]
         {

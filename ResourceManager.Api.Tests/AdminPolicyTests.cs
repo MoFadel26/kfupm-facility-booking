@@ -15,14 +15,17 @@ public class AdminPolicyTests : ApiTestBase
 
     public AdminPolicyTests(ApiFixture fixture) : base(fixture) { }
 
-    private static readonly UserRequest UserBody = new()
+    private static readonly CreateUserRequest UserBody = new()
     {
         KfupmId = "202300002",
         Name = "New User",
         Email = "new@kfupm.edu.sa",
         Role = UserRole.Student,
-        Gender = Gender.Male
+        Gender = Gender.Male,
+        Password = "new-user-password"
     };
+
+    private static readonly SetPasswordRequest PasswordBody = new() { Password = "reset-password-1" };
 
     private static readonly FacilityRequest FacilityBody = new()
     {
@@ -40,6 +43,7 @@ public class AdminPolicyTests : ApiTestBase
         { "POST", "/api/users" },
         { "PUT", $"/api/users/{AnyId}" },
         { "DELETE", $"/api/users/{AnyId}" },
+        { "PUT", $"/api/users/{AnyId}/password" },
         { "POST", "/api/facilities" },
         { "PUT", $"/api/facilities/{AnyId}" },
         { "DELETE", $"/api/facilities/{AnyId}" }
@@ -49,7 +53,10 @@ public class AdminPolicyTests : ApiTestBase
 
     private Task<HttpResponseMessage> SendWriteAsync(string method, string url, string? userId)
     {
-        object? body = method == "DELETE" ? null : url.StartsWith("/api/users") ? UserBody : FacilityBody;
+        object? body = method == "DELETE" ? null
+            : url.EndsWith("/password") ? PasswordBody
+            : url.StartsWith("/api/users") ? UserBody
+            : FacilityBody;
         return SendAsync(new HttpMethod(method), url, userId, body);
     }
 

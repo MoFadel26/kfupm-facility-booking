@@ -21,6 +21,21 @@ public class UserRequest
     public Gender Gender { get; set; }
 }
 
+/// <summary>Creating a user sets their first password, so an account an admin makes can
+/// log in. Updates go through <see cref="UserRequest"/>, which has no password: changing
+/// one is its own endpoint.</summary>
+public class CreateUserRequest : UserRequest
+{
+    [Required, StringLength(128, MinimumLength = 8)]
+    public string Password { get; set; } = string.Empty;
+}
+
+public class SetPasswordRequest
+{
+    [Required, StringLength(128, MinimumLength = 8)]
+    public string Password { get; set; } = string.Empty;
+}
+
 public class UserResponse
 {
     public Guid Id { get; set; }

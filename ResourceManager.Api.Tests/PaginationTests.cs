@@ -82,13 +82,14 @@ public class PaginationTests : ApiTestBase
     public async Task Rows_sharing_a_sort_key_still_page_without_gaps_or_repeats()
     {
         for (var i = 0; i < 12; i++)
-            (await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
+            (await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new CreateUserRequest
             {
                 KfupmId = $"2023000{i:00}",
                 Name = "Identical Name",
                 Email = $"user{i:00}@kfupm.edu.sa",
                 Role = UserRole.Student,
-                Gender = Gender.Male
+                Gender = Gender.Male,
+                Password = UserPassword
             })).EnsureSuccessStatusCode();
 
         var seen = new List<Guid>();
