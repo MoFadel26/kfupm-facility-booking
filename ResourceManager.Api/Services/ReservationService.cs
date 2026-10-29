@@ -52,14 +52,16 @@ public class ReservationService : IReservationService
             ?? throw new NotFoundException(nameof(Reservation), id);
     }
 
-    public async Task<ReservationResponse> CreateAsync(CreateReservationRequest request, CancellationToken ct = default)
+    public async Task<ReservationResponse> CreateAsync(CreateReservationRequest request, string actingUserId, CancellationToken ct = default)
     {
         EnsureTimeRangeIsValid(request.StartTime, request.EndTime);
 
+        // 403, not 404: the token is valid but names nobody this API knows, so the caller
+        // is not allowed to book. Nothing in the request itself was missing.
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.KfupmId == actingUserId, ct)
+                   ?? throw new ForbiddenException($"User '{actingUserId}' named by the token does not exist.");
         var facility = await _db.Facilities.AsNoTracking().FirstOrDefaultAsync(f => f.FacilityId == request.FacilityId, ct)
                        ?? throw new NotFoundException(nameof(Facility), request.FacilityId);
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.KfupmId == request.UserId, ct)
-                   ?? throw new NotFoundException(nameof(User), request.UserId);
 
         EnsureUserIsEligible(facility, user);
         await EnsureSlotIsFreeAsync(request.FacilityId, request.StartTime, request.EndTime, excludeReservationId: null, ct);
@@ -71,18 +73,19 @@ public class ReservationService : IReservationService
             reason: request.Reason.Trim(),
             targetParticipantCount: request.TargetParticipantCount,
             facilityId: request.FacilityId,
-            userId: request.UserId);
+            userId: user.KfupmId);
 
         _db.Reservations.Add(reservation);
         await _db.SaveChangesAsync(ct);
         return await GetByIdAsync(reservation.Id, ct);
     }
 
-    public async Task<ReservationResponse> UpdateAsync(Guid id, UpdateReservationRequest request, CancellationToken ct = default)
+    public async Task<ReservationResponse> UpdateAsync(Guid id, UpdateReservationRequest request, string actingUserId, CancellationToken ct = default)
     {
         var reservation = await _db.Reservations.FirstOrDefaultAsync(r => r.Id == id, ct)
                           ?? throw new NotFoundException(nameof(Reservation), id);
 
+        await EnsureCanChangeAsync(reservation, actingUserId, ct);
         EnsureTimeRangeIsValid(request.StartTime, request.EndTime);
         EnsureTransitionIsAllowed(reservation.Status, request.Status);
 
@@ -95,13 +98,30 @@ public class ReservationService : IReservationService
         return await GetByIdAsync(id, ct);
     }
 
-    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid id, string actingUserId, CancellationToken ct = default)
     {
         var reservation = await _db.Reservations.FirstOrDefaultAsync(r => r.Id == id, ct)
                           ?? throw new NotFoundException(nameof(Reservation), id);
 
+        await EnsureCanChangeAsync(reservation, actingUserId, ct);
+
         _db.Reservations.Remove(reservation);
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Only the owner or an admin may change a reservation. The admin role is read from
+    /// the Users table rather than a token claim, so demoting someone takes effect on
+    /// their next request instead of when their token expires.
+    /// </summary>
+    private async Task EnsureCanChangeAsync(Reservation reservation, string actingUserId, CancellationToken ct)
+    {
+        if (reservation.UserId == actingUserId)
+            return;
+
+        var isAdmin = await _db.Users.AnyAsync(u => u.KfupmId == actingUserId && u.Role == UserRole.Admin, ct);
+        if (!isAdmin)
+            throw new ForbiddenException("Only the reservation's owner or an admin can change it.");
     }
 
     /// <summary>

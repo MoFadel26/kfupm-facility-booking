@@ -1,9 +1,12 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using ResourceManager.Api.Data;
 
@@ -22,6 +25,12 @@ namespace ResourceManager.Api.Tests;
 public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly string _databaseName = $"resource_manager_test_{Guid.NewGuid():N}";
+
+    // The app validates tokens against these, set below the same way production sets
+    // them. A fresh key per run means no test secret exists anywhere to leak.
+    private const string TokenIssuer = "resource-manager-tests";
+    private const string TokenAudience = "resource-manager-api";
+    private readonly byte[] _signingKey = RandomNumberGenerator.GetBytes(32);
 
     private static string AdminConnectionString =>
         Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
@@ -65,7 +74,24 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         // a user and a reservation it did not ask for.
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:DefaultConnection", TestConnectionString);
+
+        builder.UseSetting("Authentication:Schemes:Bearer:ValidIssuer", TokenIssuer);
+        builder.UseSetting("Authentication:Schemes:Bearer:ValidAudiences:0", TokenAudience);
+        builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Issuer", TokenIssuer);
+        builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Value", Convert.ToBase64String(_signingKey));
     }
+
+    /// <summary>An HS256 bearer token whose <c>sub</c> is the given KfupmId.</summary>
+    public string CreateToken(string kfupmId)
+        => new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = TokenIssuer,
+            Audience = TokenAudience,
+            Claims = new Dictionary<string, object> { [JwtRegisteredClaimNames.Sub] = kfupmId },
+            Expires = DateTime.UtcNow.AddMinutes(10),
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(_signingKey), SecurityAlgorithms.HmacSha256)
+        });
 
     /// <summary>Empties every table. Call at the start of each test — they share one database.</summary>
     public async Task ResetAsync()

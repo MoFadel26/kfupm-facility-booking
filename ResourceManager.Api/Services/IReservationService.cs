@@ -6,7 +6,7 @@ public interface IReservationService
 {
     Task<PagedResult<ReservationResponse>> GetAllAsync(ReservationQuery query, CancellationToken ct = default);
     Task<ReservationResponse> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<ReservationResponse> CreateAsync(CreateReservationRequest request, CancellationToken ct = default);
-    Task<ReservationResponse> UpdateAsync(Guid id, UpdateReservationRequest request, CancellationToken ct = default);
-    Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<ReservationResponse> CreateAsync(CreateReservationRequest request, string actingUserId, CancellationToken ct = default);
+    Task<ReservationResponse> UpdateAsync(Guid id, UpdateReservationRequest request, string actingUserId, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, string actingUserId, CancellationToken ct = default);
 }
