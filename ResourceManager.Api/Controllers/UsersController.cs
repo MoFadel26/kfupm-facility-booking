@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ResourceManager.Api.Authorization;
 using ResourceManager.Api.DTO;
 using ResourceManager.Api.Services;
 
@@ -28,8 +30,11 @@ public class UsersController : ControllerBase
         => Ok(await _userService.GetByIdAsync(id, ct));
 
     [HttpPost]
+    [Authorize(Policy = AdminRequirement.PolicyName)]
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserResponse>> Create(UserRequest request, CancellationToken ct)
     {
@@ -38,15 +43,21 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AdminRequirement.PolicyName)]
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserResponse>> Update(Guid id, UserRequest request, CancellationToken ct)
         => Ok(await _userService.UpdateAsync(id, request, ct));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AdminRequirement.PolicyName)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
