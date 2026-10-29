@@ -122,8 +122,10 @@ CONNECTION="Host=$PG_HOST;Port=5432;Database=$PG_DATABASE;Username=$PG_ADMIN_USE
 
 echo "-- Container Apps environment $CONTAINERAPPS_ENV"
 if ! az containerapp env show -g "$RESOURCE_GROUP" -n "$CONTAINERAPPS_ENV" -o none 2>/dev/null; then
+  # Workload profiles, the CLI default, stated because the forwarded-headers
+  # setting below relies on the address ranges this environment type reserves.
   az containerapp env create -g "$RESOURCE_GROUP" -n "$CONTAINERAPPS_ENV" \
-    --location "$LOCATION" -o none
+    --location "$LOCATION" --enable-workload-profiles true -o none
 fi
 ENV_ID=$(az containerapp env show -g "$RESOURCE_GROUP" -n "$CONTAINERAPPS_ENV" --query id -o tsv)
 
@@ -164,6 +166,14 @@ trap 'rm -f "$spec"' EXIT
 # redirect would count as healthy without the database being asked. HTTPS is
 # enforced at the edge instead: allowInsecure: false makes the ingress
 # redirect HTTP to HTTPS itself.
+#
+# ForwardedHeaders__KnownNetworks: the API believes X-Forwarded-For, and so
+# rate limits sign-in per client, only from these senders. They are the ranges
+# a workload profile environment reserves for the platform (see "Restrictions
+# for subnet address ranges" in the Container Apps virtual network docs), so
+# nothing but Container Apps' own infrastructure sends from them. Microsoft
+# does not document the ingress proxy's address itself; docs/deploy.md has
+# the check to run after the first deploy.
 #
 # Probes: startup and readiness call /health/ready, which checks the database.
 # Liveness calls /health/live, which checks nothing, so a database outage
@@ -206,7 +216,15 @@ properties:
           - name: Authentication__Schemes__Bearer__SigningKeys__0__Issuer
             value: "$JWT_ISSUER"
           - name: Authentication__Schemes__Bearer__SigningKeys__0__Value
-            secretRef: jwt-signing-key$seed_env$docs_env$admin_env
+            secretRef: jwt-signing-key
+          - name: ForwardedHeaders__KnownNetworks__0
+            value: "100.100.0.0/17"
+          - name: ForwardedHeaders__KnownNetworks__1
+            value: "100.100.128.0/19"
+          - name: ForwardedHeaders__KnownNetworks__2
+            value: "100.100.160.0/19"
+          - name: ForwardedHeaders__KnownNetworks__3
+            value: "100.100.192.0/19"$seed_env$docs_env$admin_env
         probes:
           - type: Startup
             httpGet:
