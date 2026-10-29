@@ -45,6 +45,7 @@ is in `appsettings*.json` or in the image.
 | `Database__SeedSampleData` | `infra/deploy.sh`, from `SEED_SAMPLE_DATA`, only if set | `true` seeds the sample facilities and users. Default `false` |
 | `ApiDocs__Enabled` | `infra/deploy.sh`, from `API_DOCS`, only if set | `true` serves the OpenAPI document and the Scalar docs. Default `false` |
 | `Bootstrap__AdminKfupmId` | `infra/deploy.sh`, from `ADMIN_KFUPM_ID`, only if set | The KFUPM id that registers as an admin. Without it, nobody can become an admin |
+| `RateLimiting__Auth__PermitLimit` | not set; default `5` | Login and register attempts per client address per minute. The address comes from the ingress's `X-Forwarded-For` |
 | `Database__MigrateOnStartup` | not set; default `true` | Applies pending migrations before the app starts |
 | `ASPNETCORE_HTTP_PORTS` | `Dockerfile` | `8080` |
 | `ASPNETCORE_ENVIRONMENT` | .NET image default | `Production` |

@@ -72,6 +72,8 @@ another server, set `TEST_POSTGRES_CONNECTION`.
 - `POST /api/auth/login` with `{ kfupmId, password }` returns `200` with the same shape.
   A wrong id or password is `401`.
 - `GET /api/auth/me` returns the token's user.
+- Login and register together allow 5 attempts a minute per client address. More is
+  `429` with a `Retry-After` header.
 - Tokens last 60 minutes. There is no refresh; log in again.
 - Lists are paged: `?page=` (default 1), `?pageSize=` (default 25, max 100).
 - Reservations filter by `?userId=` and `?facilityId=`. Participants filter by
@@ -112,6 +114,7 @@ Configure the API with environment variables:
 | `Database__MigrateOnStartup` | Default `true`. Set `false` when running more than one instance. |
 | `Database__SeedSampleData` | Default `false`. Seeds sample data outside Development. |
 | `ApiDocs__Enabled` | Default `false`. Serves the Scalar docs outside Development. |
+| `RateLimiting__Auth__PermitLimit` | Default `5`. Login and register attempts per client address per minute. |
 
 Health checks: `GET /health/live` (process is up) and `GET /health/ready` (database is reachable).
 
@@ -135,8 +138,9 @@ runs kept each other's rows, so run 3 started with about 150,000 reservations. T
 latencies also include setup's five sign-in requests per run. These are numbers for this
 machine, not for a deployment.
 
-To repeat it, start the API on port 5080 with `Bootstrap__AdminKfupmId=209900000` and a
-signing key, then:
+To repeat it, start the API on port 5080 with `Bootstrap__AdminKfupmId=209900000`,
+`RateLimiting__Auth__PermitLimit=100` (setup signs in four times per run) and a signing
+key, then:
 
 ```bash
 k6 run -e BASE_URL=http://localhost:5080 perf/create-reservation.js

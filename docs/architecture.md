@@ -198,7 +198,7 @@ That is what puts a `traceId` on the response matching the log entry.
 
 ## 7. Tests
 
-105 integration tests. No unit tests, deliberately: the interesting behaviour is in the
+116 integration tests. No unit tests, deliberately: the interesting behaviour is in the
 interaction between the service, EF Core and PostgreSQL, and a mocked `DbContext` would
 assert that the code calls the methods it calls — not that the rules hold.
 
@@ -256,9 +256,11 @@ makes a demotion apply on the next request.
 
 - **Authentication is minimal.** The API issues its own tokens (`/api/auth/register`,
   `/api/auth/login`, HS256, 60 minutes) and hashes passwords with ASP.NET Core Identity's
-  `PasswordHasher`. There is no rate limiting on login, no refresh token and no
-  self-service password reset; an admin sets or resets passwords. Writes to participants
-  are still open.
+  `PasswordHasher`. Login and register share a limit of 5 attempts a minute per client
+  address, read from `X-Forwarded-For` behind a proxy. The limit is per process, so it
+  multiplies with replicas, and many users behind one NAT share it. There is no refresh
+  token and no self-service password reset; an admin sets or resets passwords. Writes to
+  participants are still open.
 - **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
   Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
   been run.
