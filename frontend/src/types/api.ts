@@ -67,6 +67,11 @@ export interface UserRequest {
   gender: Gender
 }
 
+/** Creating a user sets their first password; updates never carry one. */
+export interface CreateUserRequest extends UserRequest {
+  password: string
+}
+
 export interface UserResponse extends UserRequest {
   id: string
 }

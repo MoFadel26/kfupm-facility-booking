@@ -1,4 +1,5 @@
 import type {
+  CreateUserRequest,
   FacilityRequest,
   LoginRequest,
   RegisterRequest,
@@ -20,6 +21,19 @@ export function validateUser(form: UserFields): Partial<Record<keyof UserFields,
   return errors
 }
 
+export function validateNewUser(form: CreateUserRequest): Partial<Record<keyof CreateUserRequest, string>> {
+  const errors: Partial<Record<keyof CreateUserRequest, string>> = validateUser(form)
+  const passwordError = validatePassword(form.password)
+  if (passwordError) errors.password = passwordError
+  return errors
+}
+
+function validatePassword(password: string): string | undefined {
+  if (password.length < 8) return 'At least 8 characters.'
+  if (password.length > 128) return 'At most 128 characters.'
+  return undefined
+}
+
 export function validateLogin(form: LoginRequest): Partial<Record<keyof LoginRequest, string>> {
   const errors: Partial<Record<keyof LoginRequest, string>> = {}
   if (!form.kfupmId.trim()) errors.kfupmId = 'KFUPM ID is required.'
@@ -29,8 +43,8 @@ export function validateLogin(form: LoginRequest): Partial<Record<keyof LoginReq
 
 export function validateRegister(form: RegisterRequest): Partial<Record<keyof RegisterRequest, string>> {
   const errors: Partial<Record<keyof RegisterRequest, string>> = validateUser(form)
-  if (form.password.length < 8) errors.password = 'At least 8 characters.'
-  else if (form.password.length > 128) errors.password = 'At most 128 characters.'
+  const passwordError = validatePassword(form.password)
+  if (passwordError) errors.password = passwordError
   return errors
 }
 

@@ -38,15 +38,17 @@ import { errorMessage } from '@/api/client'
 import { useAuth } from '@/auth/useAuth'
 import { humanize } from '@/lib/labels'
 import { GENDERS, PAGE_SIZE, USER_ROLES } from '@/types/api'
-import type { Gender, UserRequest, UserResponse, UserRole } from '@/types/api'
-import { validateUser } from '@/lib/validation'
+import type { CreateUserRequest, Gender, UserResponse, UserRole } from '@/types/api'
+import { validateNewUser, validateUser } from '@/lib/validation'
 
-const EMPTY_FORM: UserRequest = {
+// The password is only sent when creating; an edit drops it.
+const EMPTY_FORM: CreateUserRequest = {
   kfupmId: '',
   name: '',
   email: '',
   role: 'Student',
   gender: 'Male',
+  password: '',
 }
 
 const ROLE_STYLES: Record<UserRole, string> = {
@@ -69,8 +71,8 @@ export function UsersPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<UserResponse | null>(null)
-  const [form, setForm] = useState<UserRequest>(EMPTY_FORM)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserRequest, string>>>({})
+  const [form, setForm] = useState<CreateUserRequest>(EMPTY_FORM)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CreateUserRequest, string>>>({})
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -111,20 +113,22 @@ export function UsersPage() {
       email: user.email,
       role: user.role,
       gender: user.gender,
+      password: '',
     })
     setFieldErrors({})
     setDialogOpen(true)
   }
 
   async function submit() {
-    const errors = validateUser(form)
+    const errors = editing ? validateUser(form) : validateNewUser(form)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
     setSaving(true)
     try {
       if (editing) {
-        await updateUser(editing.id, form)
+        const { password: _password, ...update } = form
+        await updateUser(editing.id, update)
         toast.success(`User "${form.name}" updated.`)
       } else {
         await createUser(form)
@@ -335,6 +339,24 @@ export function UsersPage() {
               />
               <FieldError message={fieldErrors.email} />
             </div>
+
+            {!editing && (
+              <div className="grid gap-2">
+                <Label htmlFor="user-password">Initial password</Label>
+                <Input
+                  id="user-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.password}
+                  maxLength={128}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <FieldError message={fieldErrors.password} />
+                {!fieldErrors.password && (
+                  <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="user-gender">Gender</Label>

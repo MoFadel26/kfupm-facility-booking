@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   validateFacility,
   validateLogin,
+  validateNewUser,
   validateRegister,
   validateReservation,
   validateUser,
@@ -81,6 +82,26 @@ describe('validateRegister', () => {
     expect(validateRegister({ ...valid, password: 'x'.repeat(7) }).password).toBe('At least 8 characters.')
     expect(validateRegister({ ...valid, password: 'x'.repeat(129) }).password).toBe('At most 128 characters.')
     expect(validateRegister({ ...valid, password: 'x'.repeat(128) })).toEqual({})
+  })
+})
+
+describe('validateNewUser', () => {
+  const valid = {
+    kfupmId: '202300001',
+    name: 'Ahmed',
+    email: 'a@kfupm.edu.sa',
+    role: 'Student' as const,
+    gender: 'Male' as const,
+    password: 'initial-pass',
+  }
+
+  it('accepts a user with an initial password', () => {
+    expect(validateNewUser(valid)).toEqual({})
+  })
+
+  it('requires an initial password of 8 to 128 characters', () => {
+    expect(validateNewUser({ ...valid, password: '' }).password).toBe('At least 8 characters.')
+    expect(validateNewUser({ ...valid, password: 'x'.repeat(129) }).password).toBe('At most 128 characters.')
   })
 })
 
