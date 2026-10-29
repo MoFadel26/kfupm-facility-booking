@@ -46,7 +46,8 @@ curl -X POST http://localhost:5049/api/auth/login -H 'Content-Type: application/
 ```
 
 Both return `{ token, expiresAt, user }`. Send the token as `Authorization: Bearer <token>`.
-The sample user `202300001` has no password, so it cannot log in.
+The sample users have no password, so they cannot log in until an admin sets one with
+`PUT /api/users/{id}/password`.
 
 The issuer, audience and signing key are in `appsettings.Development.json`. That key is
 for local development only and is committed on purpose; Production sets its own.
@@ -69,8 +70,7 @@ another server, set `TEST_POSTGRES_CONNECTION`.
   characters. A taken KfupmId or email is `409`. The KfupmId in
   `Bootstrap:AdminKfupmId` registers as an admin instead.
 - `POST /api/auth/login` with `{ kfupmId, password }` returns `200` with the same shape.
-  A wrong id or password is `401`. Users created through `POST /api/users` have no
-  password and cannot log in.
+  A wrong id or password is `401`.
 - `GET /api/auth/me` returns the token's user.
 - Tokens last 60 minutes. There is no refresh; log in again.
 - Lists are paged: `?page=` (default 1), `?pageSize=` (default 25, max 100).
@@ -81,6 +81,10 @@ another server, set `TEST_POSTGRES_CONNECTION`.
   user. Only the owner or a user whose role is `Admin` can change or delete a reservation.
 - `POST`, `PUT` and `DELETE` on `/api/users` and `/api/facilities` are for admins only.
   The role is read from the database on each request, so a demotion applies at once.
+- `POST /api/users` takes an initial `password` (8 to 128 characters) along with the
+  user's fields. `PUT /api/users/{id}/password` with `{ password }` sets or resets a
+  user's password and returns `204`; it is for admins only, and the user's existing
+  tokens stay valid until they expire.
 - Every `GET` and the `/api/eventparticipants` writes are open.
 - Errors are `ProblemDetails`: `400` bad request, `401` failed login, `404` not found,
   `409` rule broken, `403` the token's user does not exist or may not change that

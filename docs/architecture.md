@@ -256,9 +256,9 @@ makes a demotion apply on the next request.
 
 - **Authentication is minimal.** The API issues its own tokens (`/api/auth/register`,
   `/api/auth/login`, HS256, 60 minutes) and hashes passwords with ASP.NET Core Identity's
-  `PasswordHasher`. There is no rate limiting on login, no refresh token and no password
-  reset. Users created by an admin through `POST /api/users` have no password and cannot
-  log in. Writes to participants are still open.
+  `PasswordHasher`. There is no rate limiting on login, no refresh token and no
+  self-service password reset; an admin sets or resets passwords. Writes to participants
+  are still open.
 - **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
   Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
   been run.
