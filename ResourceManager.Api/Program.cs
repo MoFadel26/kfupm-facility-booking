@@ -1,10 +1,14 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using ResourceManager.Api.Authorization;
 using ResourceManager.Api.Data;
 using ResourceManager.Api.Exceptions;
+using ResourceManager.Api.Models;
 using ResourceManager.Api.Services;
 
 const string FrontendCorsPolicy = "Frontend";
@@ -25,19 +29,38 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IFacilityService, FacilityService>();
 builder.Services.AddScoped<IReservationService, ReservationService>();
 builder.Services.AddScoped<IEventParticipantService, EventParticipantService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-// Validates tokens only; this API does not issue them. Issuer, audiences and signing keys
-// bind from Authentication:Schemes:Bearer, the layout `dotnet user-jwts` writes, so local
-// dev tokens work with no code here. Production supplies the same keys as environment
-// variables. Inbound claim mapping is off so `sub` stays `sub` instead of being renamed
-// to a long ClaimTypes URI; it carries the user's KfupmId.
+// Issuer, audiences and signing keys bind from Authentication:Schemes:Bearer with no code
+// here. TokenService reads the same section to issue tokens, so the two cannot disagree.
+// Inbound claim mapping is off so `sub` stays `sub` instead of being renamed to a long
+// ClaimTypes URI; it carries the user's KfupmId.
 builder.Services.AddAuthentication().AddJwtBearer(options => options.MapInboundClaims = false);
-builder.Services.AddAuthorization();
+builder.Services.AddScoped<IAuthorizationHandler, AdminHandler>();
+builder.Services.AddAuthorization(options => options.AddPolicy(AdminRequirement.PolicyName, policy => policy
+    .RequireAuthenticatedUser()
+    .AddRequirements(new AdminRequirement())));
+
+// The API signs its own tokens now, so a Production start without these would come up
+// unable to log anyone in. Same reasoning as the CORS check below: fail at deploy time.
+if (builder.Environment.IsProduction())
+{
+    string[] requiredBearerKeys = ["ValidIssuer", "ValidAudiences:0", "SigningKeys:0:Issuer", "SigningKeys:0:Value"];
+    var missing = requiredBearerKeys
+        .Where(key => string.IsNullOrWhiteSpace(builder.Configuration[$"Authentication:Schemes:Bearer:{key}"]))
+        .ToArray();
+    if (missing.Length > 0)
+        throw new InvalidOperationException(
+            "Authentication:Schemes:Bearer is missing " + string.Join(", ", missing) + ". Set them, "
+            + "for example Authentication__Schemes__Bearer__ValidIssuer=resource-manager");
+}
 
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
@@ -47,7 +70,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 // One log entry per request. Headers and bodies are deliberately excluded: they carry
-// user data now and credentials once authentication lands.
+// user data, passwords and bearer tokens.
 builder.Services.AddHttpLogging(options =>
 {
     options.LoggingFields = HttpLoggingFields.RequestMethod

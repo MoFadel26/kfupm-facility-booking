@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using ResourceManager.Api.DTO;
 using ResourceManager.Api.Models.Enums;
 
@@ -48,14 +47,14 @@ public class RequestValidationTests : ApiTestBase
     [InlineData("Name", "not-an-email")] // malformed email
     public async Task A_user_needs_a_name_and_a_valid_email(string name, string email)
     {
-        var response = await Client.PostAsJsonAsync("/api/users", new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
         {
             KfupmId = "202300055",
             Name = name,
             Email = email,
             Role = UserRole.Student,
             Gender = Gender.Male
-        }, ApiFixture.Json);
+        });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -66,12 +65,12 @@ public class RequestValidationTests : ApiTestBase
     [InlineData("F-X", "   ")]
     public async Task A_facility_needs_an_id_and_a_name(string facilityId, string name)
     {
-        var response = await Client.PostAsJsonAsync("/api/facilities", new FacilityRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/facilities", ApiFixture.AdminKfupmId, new FacilityRequest
         {
             FacilityId = facilityId,
             Name = name,
             Type = FacilityType.Classroom
-        }, ApiFixture.Json);
+        });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -79,14 +78,14 @@ public class RequestValidationTests : ApiTestBase
     [Fact]
     public async Task A_user_needs_a_kfupm_id()
     {
-        var response = await Client.PostAsJsonAsync("/api/users", new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
         {
             KfupmId = "",
             Name = "Name",
             Email = "a@kfupm.edu.sa",
             Role = UserRole.Student,
             Gender = Gender.Male
-        }, ApiFixture.Json);
+        });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

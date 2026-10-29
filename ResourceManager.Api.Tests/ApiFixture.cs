@@ -9,6 +9,8 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using ResourceManager.Api.Data;
+using ResourceManager.Api.Models;
+using ResourceManager.Api.Models.Enums;
 
 namespace ResourceManager.Api.Tests;
 
@@ -31,6 +33,16 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     private const string TokenIssuer = "resource-manager-tests";
     private const string TokenAudience = "resource-manager-api";
     private readonly byte[] _signingKey = RandomNumberGenerator.GetBytes(32);
+
+    /// <summary>
+    /// An admin present in every test, because creating users and facilities now needs one.
+    /// Its id and email are unlike any a test makes, so the users a test creates never
+    /// collide with it.
+    /// </summary>
+    public const string AdminKfupmId = "100000000";
+
+    /// <summary>The id that registration turns into an admin.</summary>
+    public const string BootstrapAdminKfupmId = "200000000";
 
     private static string AdminConnectionString =>
         Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
@@ -79,6 +91,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Authentication:Schemes:Bearer:ValidAudiences:0", TokenAudience);
         builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Issuer", TokenIssuer);
         builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Value", Convert.ToBase64String(_signingKey));
+
+        builder.UseSetting("Bootstrap:AdminKfupmId", BootstrapAdminKfupmId);
     }
 
     /// <summary>An HS256 bearer token whose <c>sub</c> is the given KfupmId.</summary>
@@ -93,13 +107,19 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
                 new SymmetricSecurityKey(_signingKey), SecurityAlgorithms.HmacSha256)
         });
 
-    /// <summary>Empties every table. Call at the start of each test — they share one database.</summary>
+    /// <summary>
+    /// Empties every table, then adds back the test admin. Call at the start of each test —
+    /// they share one database.
+    /// </summary>
     public async Task ResetAsync()
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             """TRUNCATE "EventParticipants", "Reservations", "Users", "Facilities" CASCADE;""");
+
+        db.Users.Add(new User(AdminKfupmId, "Test Admin", "test-admin@kfupm.edu.sa", UserRole.Admin, Gender.Male));
+        await db.SaveChangesAsync();
     }
 
     public async Task<T> QueryAsync<T>(Func<AppDbContext, Task<T>> query)

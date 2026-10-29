@@ -32,14 +32,14 @@ public abstract class ApiTestBase : IAsyncLifetime
         AllowedGender allowedGender = AllowedGender.Any,
         AllowedRole allowedRole = AllowedRole.Any)
     {
-        var response = await Client.PostAsJsonAsync("/api/facilities", new FacilityRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/facilities", ApiFixture.AdminKfupmId, new FacilityRequest
         {
             FacilityId = facilityId,
             Name = $"Facility {facilityId}",
             Type = FacilityType.Classroom,
             AllowedGender = allowedGender,
             AllowedRole = allowedRole
-        }, ApiFixture.Json);
+        });
 
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<FacilityResponse>(ApiFixture.Json))!;
@@ -50,14 +50,14 @@ public abstract class ApiTestBase : IAsyncLifetime
         UserRole role = UserRole.Student,
         Gender gender = Gender.Male)
     {
-        var response = await Client.PostAsJsonAsync("/api/users", new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new UserRequest
         {
             KfupmId = kfupmId,
             Name = $"User {kfupmId}",
             Email = $"s{kfupmId}@kfupm.edu.sa",
             Role = role,
             Gender = gender
-        }, ApiFixture.Json);
+        });
 
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<UserResponse>(ApiFixture.Json))!;
@@ -65,14 +65,18 @@ public abstract class ApiTestBase : IAsyncLifetime
 
     /// <summary>Sends as the given user, or with no token at all when <paramref name="userId"/> is null.</summary>
     protected Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, string? userId, object? body = null)
+        => SendWithTokenAsync(method, url, userId is null ? null : Fixture.CreateToken(userId), body);
+
+    /// <summary>Sends with the given token, or with none when <paramref name="token"/> is null.</summary>
+    protected Task<HttpResponseMessage> SendWithTokenAsync(HttpMethod method, string url, string? token, object? body = null)
     {
         // Per request rather than on Client.DefaultRequestHeaders: some tests fire requests
         // concurrently, and some send them as different users.
         var request = new HttpRequestMessage(method, url);
         if (body is not null)
             request.Content = JsonContent.Create(body, body.GetType(), options: ApiFixture.Json);
-        if (userId is not null)
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Fixture.CreateToken(userId));
+        if (token is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return Client.SendAsync(request);
     }
 

@@ -60,6 +60,7 @@ public class ApiExceptionHandler : IExceptionHandler
         ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message, LogLevel.Information),
         BadRequestException => (StatusCodes.Status400BadRequest, "Bad Request", exception.Message, LogLevel.Information),
         ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message, LogLevel.Information),
+        UnauthorizedException => (StatusCodes.Status401Unauthorized, "Unauthorized", exception.Message, LogLevel.Information),
 
         // The services check their invariants before saving, but a concurrent request can
         // slip between that check and SaveChanges. The database constraint is the real

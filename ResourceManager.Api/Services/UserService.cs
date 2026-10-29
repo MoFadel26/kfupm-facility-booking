@@ -35,7 +35,7 @@ public class UserService : IUserService
 
     public async Task<UserResponse> CreateAsync(UserRequest request, CancellationToken ct = default)
     {
-        await EnsureUniqueAsync(request.KfupmId, request.Email, excludeId: null, ct);
+        await EnsureUniqueAsync(_db, request.KfupmId, request.Email, excludeId: null, ct);
 
         var user = new User(request.KfupmId.Trim(), request.Name.Trim(), request.Email.Trim(), request.Role, request.Gender);
         _db.Users.Add(user);
@@ -56,7 +56,7 @@ public class UserService : IUserService
             throw new ConflictException(
                 $"A user's KFUPM id cannot be changed (it is '{user.KfupmId}'). Create a new user instead.");
 
-        await EnsureUniqueAsync(request.KfupmId, request.Email, excludeId: id, ct);
+        await EnsureUniqueAsync(_db, request.KfupmId, request.Email, excludeId: id, ct);
 
         user.Update(request.Name.Trim(), request.Email.Trim(), request.Role, request.Gender);
         await _db.SaveChangesAsync(ct);
@@ -78,15 +78,16 @@ public class UserService : IUserService
         await _db.SaveChangesAsync(ct);
     }
 
-    private async Task EnsureUniqueAsync(string kfupmId, string email, Guid? excludeId, CancellationToken ct)
+    /// <summary>Shared with registration, which creates users too.</summary>
+    internal static async Task EnsureUniqueAsync(AppDbContext db, string kfupmId, string email, Guid? excludeId, CancellationToken ct)
     {
         var trimmedKfupmId = kfupmId.Trim();
         var trimmedEmail = email.Trim();
 
-        if (await _db.Users.AnyAsync(u => u.KfupmId == trimmedKfupmId && u.Id != excludeId, ct))
+        if (await db.Users.AnyAsync(u => u.KfupmId == trimmedKfupmId && u.Id != excludeId, ct))
             throw new ConflictException($"A user with KFUPM id '{trimmedKfupmId}' already exists.");
 
-        if (await _db.Users.AnyAsync(u => u.Email == trimmedEmail && u.Id != excludeId, ct))
+        if (await db.Users.AnyAsync(u => u.Email == trimmedEmail && u.Id != excludeId, ct))
             throw new ConflictException($"A user with email '{trimmedEmail}' already exists.");
     }
 }
