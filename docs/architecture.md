@@ -7,7 +7,7 @@ and what it costs.
 
 ## The shape
 
-19 endpoints across four resources, layered:
+22 endpoints across four resources and auth, layered:
 
 ```
 Controllers/    HTTP only: bind, delegate, return. No rules live here.
@@ -198,7 +198,7 @@ That is what puts a `traceId` on the response matching the log entry.
 
 ## 7. Tests
 
-78 integration tests. No unit tests, deliberately: the interesting behaviour is in the
+105 integration tests. No unit tests, deliberately: the interesting behaviour is in the
 interaction between the service, EF Core and PostgreSQL, and a mocked `DbContext` would
 assert that the code calls the methods it calls — not that the rules hold.
 
@@ -236,17 +236,29 @@ exists in `pg_constraint`.
 - **Headers and bodies are excluded from logs** — user data now, credentials later.
 - **CORS origins come from configuration**, and Production refuses to start without
   them: a startup failure at deploy time beats a frontend that silently cannot reach
-  its API.
+  its API. The same goes for the token issuer, audience and signing key.
+
+---
+
+## 9. The admin role is read from the database
+
+Tokens carry `sub` and `name`, no role. The `Admin` policy on user and facility writes,
+and the owner-or-admin check on reservations, look the user up in `Users` on each
+request. A role claim would save that lookup, but it is a copy taken at login: demote an
+admin and their token keeps working as an admin until it expires. Reading the table
+makes a demotion apply on the next request.
+
+**Cost:** one query on the unique `KfupmId` index for each request that needs the role.
 
 ---
 
 ## What is missing
 
-- **Authentication is validation only.** The API checks JWT bearer tokens on reservation
-  writes and takes the acting user from `sub`; ownership (owner or Admin, role read from
-  the database) is checked in the service. Nothing issues tokens yet — locally they come
-  from `dotnet user-jwts` — and the frontend does not send them, so its booking and
-  cancel calls now get `401`. Writes to users, facilities and participants are still open.
+- **Authentication is minimal.** The API issues its own tokens (`/api/auth/register`,
+  `/api/auth/login`, HS256, 60 minutes) and hashes passwords with ASP.NET Core Identity's
+  `PasswordHasher`. There is no rate limiting on login, no refresh token and no password
+  reset. Users created by an admin through `POST /api/users` have no password and cannot
+  log in. Writes to participants are still open.
 - **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
   Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
   been run.
