@@ -93,6 +93,9 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Value", Convert.ToBase64String(_signingKey));
 
         builder.UseSetting("Bootstrap:AdminKfupmId", BootstrapAdminKfupmId);
+        // Every test client shares one address, so the real limit of 5 a minute would
+        // trip across unrelated tests. AuthRateLimitTests sets it back for its own host.
+        builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000");
     }
 
     /// <summary>An HS256 bearer token whose <c>sub</c> is the given KfupmId.</summary>

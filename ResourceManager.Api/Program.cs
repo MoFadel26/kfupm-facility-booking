@@ -1,11 +1,15 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using ResourceManager.Api.Authorization;
+using ResourceManager.Api.Controllers;
 using ResourceManager.Api.Data;
 using ResourceManager.Api.Exceptions;
 using ResourceManager.Api.Models;
@@ -110,6 +114,55 @@ builder.Services.AddCors(options =>
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
+// Login and register are where passwords get guessed, so each client address gets a few
+// attempts a minute across both. A fixed window is enough here: the point is to make
+// guessing slow, not to shape traffic. The limit is configuration so tests can raise it.
+var authPermitLimit = builder.Configuration.GetValue("RateLimiting:Auth:PermitLimit", 5);
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy(AuthController.RateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = authPermitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+
+    options.OnRejected = async (context, ct) =>
+    {
+        var response = context.HttpContext.Response;
+        response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+
+        await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>()
+            .TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = context.HttpContext,
+                ProblemDetails = new ProblemDetails
+                {
+                    Status = StatusCodes.Status429TooManyRequests,
+                    Title = "Too Many Requests",
+                    Detail = "Too many sign-in attempts. Try again in a minute."
+                }
+            });
+    };
+});
+
+// Behind Container Apps' ingress (or CloudFront) every request arrives from the proxy, so
+// the rate limiter would put all clients in one bucket. The proxy appends the real client
+// address to X-Forwarded-For, and with the default ForwardLimit of 1 only that last entry
+// is used, so a value the client sent itself is ignored. The proxy's address is not fixed,
+// so the known lists are cleared. That trusts the header from anyone who can reach the
+// container directly, which on Container Apps is no one but the ingress.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
 // Migrating on startup is convenient and fine for a single instance. Two instances
@@ -139,6 +192,8 @@ if (app.Environment.IsDevelopment() || builder.Configuration.GetValue("ApiDocs:E
     app.MapScalarApiReference();
 }
 
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
@@ -149,6 +204,9 @@ app.UseHttpLogging();
 
 app.UseExceptionHandler();
 app.UseCors(FrontendCorsPolicy);
+
+// After CORS for the same reason as authentication below: a 429 must reach the browser.
+app.UseRateLimiter();
 
 // After CORS, so a 401 still carries the CORS headers and the browser shows the real
 // status rather than a CORS error.
