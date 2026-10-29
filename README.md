@@ -115,6 +115,7 @@ Configure the API with environment variables:
 | `Database__SeedSampleData` | Default `false`. Seeds sample data outside Development. |
 | `ApiDocs__Enabled` | Default `false`. Serves the Scalar docs outside Development. |
 | `RateLimiting__Auth__PermitLimit` | Default `5`. Login and register attempts per client address per minute. |
+| `ForwardedHeaders__KnownNetworks__0`, `__1`, … | Proxy networks (CIDR) whose `X-Forwarded-For` is believed. Default none beyond loopback, so the client address is the TCP peer. |
 
 Health checks: `GET /health/live` (process is up) and `GET /health/ready` (database is reachable).
 

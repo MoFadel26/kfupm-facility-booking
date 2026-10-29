@@ -150,17 +150,20 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// Behind Container Apps' ingress (or CloudFront) every request arrives from the proxy, so
-// the rate limiter would put all clients in one bucket. The proxy appends the real client
-// address to X-Forwarded-For, and with the default ForwardLimit of 1 only that last entry
-// is used, so a value the client sent itself is ignored. The proxy's address is not fixed,
-// so the known lists are cleared. That trusts the header from anyone who can reach the
-// container directly, which on Container Apps is no one but the ingress.
+// Behind Container Apps' ingress every request arrives from the proxy, so the rate limiter
+// would put all clients in one bucket. The ingress appends the real client address to
+// X-Forwarded-For, and with the default ForwardLimit of 1 only that last entry is used.
+// The header is trusted only from the networks in ForwardedHeaders:KnownNetworks (plus
+// loopback, the framework default). From any other sender it is ignored, so a client that
+// reaches the container directly cannot pick a new address, and a new rate-limit bucket,
+// per request. With nothing configured, every proxied client shares the proxy's bucket:
+// the limit gets stricter, not weaker.
+var trustedProxyNetworks = builder.Configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [];
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    foreach (var network in trustedProxyNetworks)
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
 });
 
 var app = builder.Build();

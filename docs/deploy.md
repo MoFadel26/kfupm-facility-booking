@@ -46,6 +46,7 @@ is in `appsettings*.json` or in the image.
 | `ApiDocs__Enabled` | `infra/deploy.sh`, from `API_DOCS`, only if set | `true` serves the OpenAPI document and the Scalar docs. Default `false` |
 | `Bootstrap__AdminKfupmId` | `infra/deploy.sh`, from `ADMIN_KFUPM_ID`, only if set | The KFUPM id that registers as an admin. Without it, nobody can become an admin |
 | `RateLimiting__Auth__PermitLimit` | not set; default `5` | Login and register attempts per client address per minute. The address comes from the ingress's `X-Forwarded-For` |
+| `ForwardedHeaders__KnownNetworks__0` to `__3` | `infra/deploy.sh` | The platform-reserved ranges `100.100.0.0/17`, `100.100.128.0/19`, `100.100.160.0/19`, `100.100.192.0/19`. `X-Forwarded-For` is believed only from these senders |
 | `Database__MigrateOnStartup` | not set; default `true` | Applies pending migrations before the app starts |
 | `ASPNETCORE_HTTP_PORTS` | `Dockerfile` | `8080` |
 | `ASPNETCORE_ENVIRONMENT` | .NET image default | `Production` |
@@ -158,6 +159,25 @@ Needs the Azure CLI and the GitHub CLI, both signed in.
    ```sh
    gh run rerun --failed
    ```
+
+7. Check that the sign-in rate limit tells clients apart. Microsoft does not
+   document the address the ingress proxy connects from, so this confirms the
+   ranges above cover it. From one machine, send six failed logins inside a
+   minute:
+
+   ```sh
+   for i in 1 2 3 4 5 6; do
+     curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<app url>/api/auth/login \
+       -H 'Content-Type: application/json' -d '{"kfupmId":"0","password":"x"}'
+   done
+   ```
+
+   The sixth answers `429`. Then, within that minute, log in from a different
+   network (a phone off Wi-Fi). It should answer `401` or `200`, not `429`. A
+   `429` there means the proxy's address is outside the trusted ranges, so all
+   clients share one limit: find the address the requests arrive from and set
+   `ForwardedHeaders__KnownNetworks` to cover it. The failure is a limit that
+   is too strict, never one that can be dodged.
 
 From then on, running the workflow deploys the commit it runs on.
 
