@@ -11,6 +11,10 @@ public class User : EntityBase
     public UserRole Role { get; private set;}
     public Gender Gender { get; private set;}
 
+    /// <summary>Null for a user an admin created, who has never set a password and so
+    /// cannot log in.</summary>
+    public string? PasswordHash { get; private set; }
+
     public ICollection<Reservation> Reservations { get; private set;} = new List<Reservation>();
     public ICollection<EventParticipant> EventParticipants { get; private set;} = new List<EventParticipant>();
 
@@ -34,4 +38,6 @@ public class User : EntityBase
         Role = role;
         Gender = gender;
     }
+
+    public void SetPasswordHash(string passwordHash) => PasswordHash = passwordHash;
 }
