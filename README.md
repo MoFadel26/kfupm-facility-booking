@@ -35,6 +35,16 @@ npm run dev         # http://localhost:5173
 
 The database role must be allowed to `CREATE EXTENSION` (the migration adds `btree_gist`).
 
+Booking, changing or deleting a reservation needs a bearer token. Create a dev token
+from the repo root, naming a user that exists (`202300001` is in the sample data):
+
+```bash
+dotnet user-jwts create --project ResourceManager.Api --name <KfupmId>
+```
+
+It prints the token. The signing key goes to user secrets; the issuer and audiences
+are already in `appsettings.Development.json`.
+
 ## Test
 
 ```bash
@@ -51,7 +61,13 @@ another server, set `TEST_POSTGRES_CONNECTION`.
 - Lists are paged: `?page=` (default 1), `?pageSize=` (default 25, max 100).
 - Reservations filter by `?userId=` and `?facilityId=`. Participants filter by
   `?userId=` and `?reservationId=`.
-- Errors are `ProblemDetails`: `400` bad request, `404` not found, `409` rule broken.
+- `POST`, `PUT` and `DELETE` on `/api/reservations` need `Authorization: Bearer <token>`.
+  The token's `sub` claim is the acting user's KfupmId; a new reservation belongs to that
+  user. Only the owner or a user whose role is `Admin` can change or delete a reservation.
+  Everything else is open.
+- Errors are `ProblemDetails`: `400` bad request, `404` not found, `409` rule broken,
+  `403` the token's user does not exist or may not change that reservation. A missing or
+  invalid token is `401` with no body.
 
 ## Deploy
 

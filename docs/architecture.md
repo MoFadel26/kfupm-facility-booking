@@ -198,7 +198,7 @@ That is what puts a `traceId` on the response matching the log entry.
 
 ## 7. Tests
 
-71 integration tests. No unit tests, deliberately: the interesting behaviour is in the
+78 integration tests. No unit tests, deliberately: the interesting behaviour is in the
 interaction between the service, EF Core and PostgreSQL, and a mocked `DbContext` would
 assert that the code calls the methods it calls — not that the rules hold.
 
@@ -242,12 +242,11 @@ exists in `pg_constraint`.
 
 ## What is missing
 
-- **No authentication.** The largest gap, and the sharpest edge is not that writes are
-  open: `CreateReservationRequest.UserId` comes from the request body, so a caller can
-  book as anyone. The fix is that the acting user comes from the token and that field
-  disappears. Ownership rules (a student cancels their own booking, an admin any) are
-  resource-based authorization, not a role check — `[Authorize(Roles = "Admin")]` cannot
-  express "your own".
+- **Authentication is validation only.** The API checks JWT bearer tokens on reservation
+  writes and takes the acting user from `sub`; ownership (owner or Admin, role read from
+  the database) is checked in the service. Nothing issues tokens yet — locally they come
+  from `dotnet user-jwts` — and the frontend does not send them, so its booking and
+  cancel calls now get `401`. Writes to users, facilities and participants are still open.
 - **Nothing deployed.** The app is configurable and containerised; choosing a host and
   provisioning a database is what remains.
 - **No frontend tests.**
