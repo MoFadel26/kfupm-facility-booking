@@ -31,6 +31,14 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
+// Validates tokens only; this API does not issue them. Issuer, audiences and signing keys
+// bind from Authentication:Schemes:Bearer, the layout `dotnet user-jwts` writes, so local
+// dev tokens work with no code here. Production supplies the same keys as environment
+// variables. Inbound claim mapping is off so `sub` stays `sub` instead of being renamed
+// to a long ClaimTypes URI; it carries the user's KfupmId.
+builder.Services.AddAuthentication().AddJwtBearer(options => options.MapInboundClaims = false);
+builder.Services.AddAuthorization();
+
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
 // ApiExceptionHandler writes through this rather than serialising a ProblemDetails
@@ -118,6 +126,11 @@ app.UseHttpLogging();
 
 app.UseExceptionHandler();
 app.UseCors(FrontendCorsPolicy);
+
+// After CORS, so a 401 still carries the CORS headers and the browser shows the real
+// status rather than a CORS error.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 
