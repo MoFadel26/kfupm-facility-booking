@@ -36,16 +36,6 @@ public class ReservationRulesTests : ApiTestBase
     }
 
     [Fact]
-    public async Task Booking_as_an_unknown_user_is_not_found()
-    {
-        await SetupAsync();
-
-        var response = await PostReservationAsync(At(10), At(12), userId: "999999999");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
     public async Task A_gender_restricted_facility_rejects_a_user_of_another_gender()
     {
         await CreateFacilityAsync("F-POOL-W", allowedGender: AllowedGender.Female);

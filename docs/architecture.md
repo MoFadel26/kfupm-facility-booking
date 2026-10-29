@@ -1,16 +1,13 @@
 # Architecture & decisions
 
-Why this codebase is the way it is. Written to be defended out loud: each decision
-carries the alternative it beat and what it costs.
-
-Read this *after* trying to answer the questions yourself — it is much easier to
-recognise a good answer than to produce one, and an interview asks you to produce one.
+Why this codebase is the way it is. Each decision carries the alternative it beat
+and what it costs.
 
 ---
 
 ## The shape
 
-19 endpoints across four resources, layered:
+22 endpoints across four resources and auth, layered:
 
 ```
 Controllers/    HTTP only: bind, delegate, return. No rules live here.
@@ -150,7 +147,7 @@ page, because the database still walks the skipped rows — irrelevant at thousa
 rows, and it buys the ability to jump to page 5, which keyset cursors cannot do. At
 millions of rows, or an infinite scroll, keyset would be the right call.
 
-**The subtlety worth knowing.** Offset paging is only correct if the sort key is
+**The sort key must be unique.** Offset paging is only correct if the sort key is
 *unique*. Order users by name alone and rows with equal names have no defined order, so
 the database may return them differently between two queries — a row appears on both
 pages, or on neither. Hence `.OrderBy(u => u.Name).ThenBy(u => u.Id)` everywhere. There
@@ -201,7 +198,7 @@ That is what puts a `traceId` on the response matching the log entry.
 
 ## 7. Tests
 
-71 integration tests. No unit tests, deliberately: the interesting behaviour is in the
+116 integration tests. No unit tests, deliberately: the interesting behaviour is in the
 interaction between the service, EF Core and PostgreSQL, and a mocked `DbContext` would
 assert that the code calls the methods it calls — not that the rules hold.
 
@@ -239,21 +236,36 @@ exists in `pg_constraint`.
 - **Headers and bodies are excluded from logs** — user data now, credentials later.
 - **CORS origins come from configuration**, and Production refuses to start without
   them: a startup failure at deploy time beats a frontend that silently cannot reach
-  its API.
+  its API. The same goes for the token issuer, audience and signing key.
 
 ---
 
-## What is missing, and what you would do next
+## 9. The admin role is read from the database
 
-- **No authentication.** The largest gap, and the sharpest edge is not that writes are
-  open: `CreateReservationRequest.UserId` comes from the request body, so a caller can
-  book as anyone. The fix is that the acting user comes from the token and that field
-  disappears. Ownership rules (a student cancels their own booking, an admin any) are
-  resource-based authorization, not a role check — `[Authorize(Roles = "Admin")]` cannot
-  express "your own".
-- **Nothing deployed.** The app is configurable and containerised; choosing a host and
-  provisioning a database is what remains.
-- **No frontend tests.**
+Tokens carry `sub` and `name`, no role. The `Admin` policy on user and facility writes,
+and the owner-or-admin check on reservations, look the user up in `Users` on each
+request. A role claim would save that lookup, but it is a copy taken at login: demote an
+admin and their token keeps working as an admin until it expires. Reading the table
+makes a demotion apply on the next request.
+
+**Cost:** one query on the unique `KfupmId` index for each request that needs the role.
+
+---
+
+## What is missing
+
+- **Authentication is minimal.** The API issues its own tokens (`/api/auth/register`,
+  `/api/auth/login`, HS256, 60 minutes) and hashes passwords with ASP.NET Core Identity's
+  `PasswordHasher`. Login and register share a limit of 5 attempts a minute per client
+  address, read from `X-Forwarded-For` behind a proxy. The limit is per process, so it
+  multiplies with replicas, and many users behind one NAT share it. There is no refresh
+  token and no self-service password reset; an admin sets or resets passwords. Writes to
+  participants are still open.
+- **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
+  Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
+  been run.
+- **Few frontend tests.** Vitest covers the app shell, the date, label and validation
+  helpers, and the reservations page. The other pages have none.
 - **Known rough edges:** `Reservation` exposes `Status` as a settable field on the update
   DTO rather than `confirm`/`cancel` endpoints — that lands with auth, since the point of
   separate endpoints is separate policies.

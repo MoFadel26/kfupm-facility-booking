@@ -1,7 +1,16 @@
-import type { FacilityRequest, ReservationStatus, UserRequest } from '@/types/api'
+import type {
+  CreateUserRequest,
+  FacilityRequest,
+  LoginRequest,
+  RegisterRequest,
+  ReservationStatus,
+  UserRequest,
+} from '@/types/api'
 
-export function validateUser(form: UserRequest): Partial<Record<keyof UserRequest, string>> {
-  const errors: Partial<Record<keyof UserRequest, string>> = {}
+type UserFields = Pick<UserRequest, 'kfupmId' | 'name' | 'email'>
+
+export function validateUser(form: UserFields): Partial<Record<keyof UserFields, string>> {
+  const errors: Partial<Record<keyof UserFields, string>> = {}
   if (!form.kfupmId.trim()) errors.kfupmId = 'KFUPM ID is required.'
   else if (form.kfupmId.length > 20) errors.kfupmId = 'At most 20 characters.'
   if (!form.name.trim()) errors.name = 'Name is required.'
@@ -9,6 +18,33 @@ export function validateUser(form: UserRequest): Partial<Record<keyof UserReques
   if (!form.email.trim()) errors.email = 'Email is required.'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email.'
   else if (form.email.length > 150) errors.email = 'At most 150 characters.'
+  return errors
+}
+
+export function validateNewUser(form: CreateUserRequest): Partial<Record<keyof CreateUserRequest, string>> {
+  const errors: Partial<Record<keyof CreateUserRequest, string>> = validateUser(form)
+  const passwordError = validatePassword(form.password)
+  if (passwordError) errors.password = passwordError
+  return errors
+}
+
+function validatePassword(password: string): string | undefined {
+  if (password.length < 8) return 'At least 8 characters.'
+  if (password.length > 128) return 'At most 128 characters.'
+  return undefined
+}
+
+export function validateLogin(form: LoginRequest): Partial<Record<keyof LoginRequest, string>> {
+  const errors: Partial<Record<keyof LoginRequest, string>> = {}
+  if (!form.kfupmId.trim()) errors.kfupmId = 'KFUPM ID is required.'
+  if (!form.password) errors.password = 'Password is required.'
+  return errors
+}
+
+export function validateRegister(form: RegisterRequest): Partial<Record<keyof RegisterRequest, string>> {
+  const errors: Partial<Record<keyof RegisterRequest, string>> = validateUser(form)
+  const passwordError = validatePassword(form.password)
+  if (passwordError) errors.password = passwordError
   return errors
 }
 
@@ -27,14 +63,12 @@ export interface ReservationFormState {
   reason: string
   targetParticipantCount: string
   facilityId: string
-  userId: string
   status: ReservationStatus
 }
 
 export function validateReservation(form: ReservationFormState, isEdit: boolean): Partial<Record<keyof ReservationFormState, string>> {
   const errors: Partial<Record<keyof ReservationFormState, string>> = {}
   if (!isEdit && !form.facilityId) errors.facilityId = 'Select a facility.'
-  if (!isEdit && !form.userId) errors.userId = 'Select a user.'
   if (!form.startTime) errors.startTime = 'Start time is required.'
   if (!form.endTime) errors.endTime = 'End time is required.'
   if (form.startTime && form.endTime && form.startTime >= form.endTime) {

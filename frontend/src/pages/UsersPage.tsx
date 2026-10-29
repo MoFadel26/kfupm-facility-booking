@@ -35,17 +35,20 @@ import { EmptyRow, ErrorRow, LoadErrorBanner, LoadingRow } from '@/components/sh
 import { PaginationControls } from '@/components/shared/PaginationControls'
 import { createUser, deleteUser, listUsers, updateUser } from '@/api/users'
 import { errorMessage } from '@/api/client'
+import { useAuth } from '@/auth/useAuth'
 import { humanize } from '@/lib/labels'
 import { GENDERS, PAGE_SIZE, USER_ROLES } from '@/types/api'
-import type { Gender, UserRequest, UserResponse, UserRole } from '@/types/api'
-import { validateUser } from '@/lib/validation'
+import type { CreateUserRequest, Gender, UserResponse, UserRole } from '@/types/api'
+import { validateNewUser, validateUser } from '@/lib/validation'
 
-const EMPTY_FORM: UserRequest = {
+// The password is only sent when creating; an edit drops it.
+const EMPTY_FORM: CreateUserRequest = {
   kfupmId: '',
   name: '',
   email: '',
   role: 'Student',
   gender: 'Male',
+  password: '',
 }
 
 const ROLE_STYLES: Record<UserRole, string> = {
@@ -57,6 +60,7 @@ const ROLE_STYLES: Record<UserRole, string> = {
 }
 
 export function UsersPage() {
+  const { isAdmin } = useAuth()
   const [users, setUsers] = useState<UserResponse[] | null>(null)
   const [page, setPage] = useState(1)
   const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
@@ -67,8 +71,8 @@ export function UsersPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<UserResponse | null>(null)
-  const [form, setForm] = useState<UserRequest>(EMPTY_FORM)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserRequest, string>>>({})
+  const [form, setForm] = useState<CreateUserRequest>(EMPTY_FORM)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CreateUserRequest, string>>>({})
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -109,20 +113,22 @@ export function UsersPage() {
       email: user.email,
       role: user.role,
       gender: user.gender,
+      password: '',
     })
     setFieldErrors({})
     setDialogOpen(true)
   }
 
   async function submit() {
-    const errors = validateUser(form)
+    const errors = editing ? validateUser(form) : validateNewUser(form)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
     setSaving(true)
     try {
       if (editing) {
-        await updateUser(editing.id, form)
+        const { password: _password, ...update } = form
+        await updateUser(editing.id, update)
         toast.success(`User "${form.name}" updated.`)
       } else {
         await createUser(form)
@@ -160,15 +166,19 @@ export function UsersPage() {
     })
   }, [users, searchQuery, roleFilter])
 
+  const columnCount = isAdmin ? 6 : 5
+
   return (
     <div>
       <PageHeader
         title="Users"
         description="Students, faculty and staff who can book facilities."
         action={
-          <Button onClick={openCreate}>
-            <PlusIcon weight="bold" /> Add user
-          </Button>
+          isAdmin && (
+            <Button onClick={openCreate}>
+              <PlusIcon weight="bold" /> Add user
+            </Button>
+          )
         }
       />
 
@@ -210,18 +220,20 @@ export function UsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Gender</TableHead>
-                <TableHead className="w-28">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                {isAdmin && (
+                  <TableHead className="w-28">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadError ? (
-                <ErrorRow colSpan={6} message={loadError} />
+                <ErrorRow colSpan={columnCount} message={loadError} />
               ) : filteredUsers === null ? (
-                <LoadingRow colSpan={6} />
+                <LoadingRow colSpan={columnCount} />
               ) : filteredUsers.length === 0 ? (
-                <EmptyRow colSpan={6} message="No users found." />
+                <EmptyRow colSpan={columnCount} message="No users found." />
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id}>
@@ -234,17 +246,19 @@ export function UsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{user.gender}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
-                          Edit
-                        </Button>
-                        <ConfirmDelete
-                          description={`This deletes ${user.name} (${user.kfupmId}). Users with reservations or participant records cannot be deleted.`}
-                          onConfirm={() => remove(user)}
-                        />
-                      </div>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
+                            Edit
+                          </Button>
+                          <ConfirmDelete
+                            description={`This deletes ${user.name} (${user.kfupmId}). Users with reservations or participant records cannot be deleted.`}
+                            onConfirm={() => remove(user)}
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -325,6 +339,24 @@ export function UsersPage() {
               />
               <FieldError message={fieldErrors.email} />
             </div>
+
+            {!editing && (
+              <div className="grid gap-2">
+                <Label htmlFor="user-password">Initial password</Label>
+                <Input
+                  id="user-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.password}
+                  maxLength={128}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <FieldError message={fieldErrors.password} />
+                {!fieldErrors.password && (
+                  <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="user-gender">Gender</Label>

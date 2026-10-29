@@ -20,8 +20,8 @@ public class CreateReservationRequest
     [Required, MaxLength(20)]
     public string FacilityId { get; set; } = string.Empty;
 
-    [Required, MaxLength(20)]
-    public string UserId { get; set; } = string.Empty;
+    // No UserId: the reservation belongs to whoever the bearer token names. Taking it from
+    // the body would let any signed-in user book in someone else's name.
 }
 
 public class UpdateReservationRequest

@@ -17,24 +17,24 @@ public class NaturalKeyTests : ApiTestBase
     public NaturalKeyTests(ApiFixture fixture) : base(fixture) { }
 
     private Task<HttpResponseMessage> PutUserAsync(Guid id, string kfupmId) =>
-        Client.PutAsJsonAsync($"/api/users/{id}", new UserRequest
+        SendAsync(HttpMethod.Put, $"/api/users/{id}", ApiFixture.AdminKfupmId, new UserRequest
         {
             KfupmId = kfupmId,
             Name = "Renamed",
             Email = "renamed@kfupm.edu.sa",
             Role = UserRole.Student,
             Gender = Gender.Male
-        }, ApiFixture.Json);
+        });
 
     private Task<HttpResponseMessage> PutFacilityAsync(Guid id, string facilityId) =>
-        Client.PutAsJsonAsync($"/api/facilities/{id}", new FacilityRequest
+        SendAsync(HttpMethod.Put, $"/api/facilities/{id}", ApiFixture.AdminKfupmId, new FacilityRequest
         {
             FacilityId = facilityId,
             Name = "Renamed",
             Type = FacilityType.Classroom,
             AllowedGender = AllowedGender.Any,
             AllowedRole = AllowedRole.Any
-        }, ApiFixture.Json);
+        });
 
     [Fact]
     public async Task A_users_kfupm_id_cannot_change_while_a_reservation_references_it()

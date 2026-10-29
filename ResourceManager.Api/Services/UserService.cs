@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ResourceManager.Api.Data;
 using ResourceManager.Api.DTO;
@@ -9,10 +10,12 @@ namespace ResourceManager.Api.Services;
 public class UserService : IUserService
 {
     private readonly AppDbContext _db;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
-    public UserService(AppDbContext db)
+    public UserService(AppDbContext db, IPasswordHasher<User> passwordHasher)
     {
         _db = db;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<PagedResult<UserResponse>> GetAllAsync(PageQuery query, CancellationToken ct = default)
@@ -33,11 +36,12 @@ public class UserService : IUserService
             ?? throw new NotFoundException(nameof(User), id);
     }
 
-    public async Task<UserResponse> CreateAsync(UserRequest request, CancellationToken ct = default)
+    public async Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
-        await EnsureUniqueAsync(request.KfupmId, request.Email, excludeId: null, ct);
+        await EnsureUniqueAsync(_db, request.KfupmId, request.Email, excludeId: null, ct);
 
         var user = new User(request.KfupmId.Trim(), request.Name.Trim(), request.Email.Trim(), request.Role, request.Gender);
+        user.SetPasswordHash(_passwordHasher.HashPassword(user, request.Password));
         _db.Users.Add(user);
         await _db.SaveChangesAsync(ct);
         return user.ToResponse();
@@ -56,7 +60,7 @@ public class UserService : IUserService
             throw new ConflictException(
                 $"A user's KFUPM id cannot be changed (it is '{user.KfupmId}'). Create a new user instead.");
 
-        await EnsureUniqueAsync(request.KfupmId, request.Email, excludeId: id, ct);
+        await EnsureUniqueAsync(_db, request.KfupmId, request.Email, excludeId: id, ct);
 
         user.Update(request.Name.Trim(), request.Email.Trim(), request.Role, request.Gender);
         await _db.SaveChangesAsync(ct);
@@ -78,15 +82,29 @@ public class UserService : IUserService
         await _db.SaveChangesAsync(ct);
     }
 
-    private async Task EnsureUniqueAsync(string kfupmId, string email, Guid? excludeId, CancellationToken ct)
+    /// <summary>
+    /// Sets or replaces the password. This is how a user from before passwords existed, or
+    /// one who forgot theirs, gets back in: an admin sets one and tells them.
+    /// </summary>
+    public async Task SetPasswordAsync(Guid id, SetPasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
+                   ?? throw new NotFoundException(nameof(User), id);
+
+        user.SetPasswordHash(_passwordHasher.HashPassword(user, request.Password));
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Shared with registration, which creates users too.</summary>
+    internal static async Task EnsureUniqueAsync(AppDbContext db, string kfupmId, string email, Guid? excludeId, CancellationToken ct)
     {
         var trimmedKfupmId = kfupmId.Trim();
         var trimmedEmail = email.Trim();
 
-        if (await _db.Users.AnyAsync(u => u.KfupmId == trimmedKfupmId && u.Id != excludeId, ct))
+        if (await db.Users.AnyAsync(u => u.KfupmId == trimmedKfupmId && u.Id != excludeId, ct))
             throw new ConflictException($"A user with KFUPM id '{trimmedKfupmId}' already exists.");
 
-        if (await _db.Users.AnyAsync(u => u.Email == trimmedEmail && u.Id != excludeId, ct))
+        if (await db.Users.AnyAsync(u => u.Email == trimmedEmail && u.Id != excludeId, ct))
             throw new ConflictException($"A user with email '{trimmedEmail}' already exists.");
     }
 }

@@ -67,8 +67,35 @@ export interface UserRequest {
   gender: Gender
 }
 
+/** Creating a user sets their first password; updates never carry one. */
+export interface CreateUserRequest extends UserRequest {
+  password: string
+}
+
 export interface UserResponse extends UserRequest {
   id: string
+}
+
+// ---------- Auth ----------
+
+export interface LoginRequest {
+  kfupmId: string
+  password: string
+}
+
+export interface RegisterRequest {
+  kfupmId: string
+  name: string
+  email: string
+  gender: Gender
+  password: string
+}
+
+export interface AuthResponse {
+  token: string
+  /** ISO-8601. */
+  expiresAt: string
+  user: UserResponse
 }
 
 // ---------- Facilities ----------
@@ -93,7 +120,6 @@ export interface CreateReservationRequest {
   reason: string
   targetParticipantCount: number
   facilityId: string
-  userId: string
 }
 
 export interface UpdateReservationRequest {

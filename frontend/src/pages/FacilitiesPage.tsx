@@ -36,6 +36,7 @@ import { EmptyRow, ErrorRow, LoadErrorBanner, LoadingRow } from '@/components/sh
 import { PaginationControls } from '@/components/shared/PaginationControls'
 import { createFacility, deleteFacility, listFacilities, updateFacility } from '@/api/facilities'
 import { errorMessage } from '@/api/client'
+import { useAuth } from '@/auth/useAuth'
 import { humanize } from '@/lib/labels'
 import { ALLOWED_GENDERS, ALLOWED_ROLES, FACILITY_TYPES, PAGE_SIZE } from '@/types/api'
 import type {
@@ -62,6 +63,7 @@ function eligibility(facility: FacilityResponse) {
 }
 
 export function FacilitiesPage() {
+  const { isAdmin } = useAuth()
   const [facilities, setFacilities] = useState<FacilityResponse[] | null>(null)
   const [page, setPage] = useState(1)
   const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
@@ -161,6 +163,7 @@ export function FacilitiesPage() {
   }, [facilities, searchQuery, selectedType])
 
   const hasFilters = searchQuery !== '' || selectedType !== 'ALL'
+  const columnCount = isAdmin ? 6 : 5
 
   return (
     <div>
@@ -168,9 +171,11 @@ export function FacilitiesPage() {
         title="Facilities"
         description="Rooms, labs and sports facilities that can be booked."
         action={
-          <Button onClick={openCreate}>
-            <PlusIcon weight="bold" /> Add facility
-          </Button>
+          isAdmin && (
+            <Button onClick={openCreate}>
+              <PlusIcon weight="bold" /> Add facility
+            </Button>
+          )
         }
       />
 
@@ -227,9 +232,13 @@ export function FacilitiesPage() {
             <div className="rounded-md border border-dashed border-input px-6 py-12 text-center">
               <h2 className="text-base font-semibold">No facilities found</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {hasFilters ? 'Change the search or the type filter.' : 'Add the first facility to start taking bookings.'}
+                {hasFilters
+                  ? 'Change the search or the type filter.'
+                  : isAdmin
+                    ? 'Add the first facility to start taking bookings.'
+                    : 'No facilities have been added yet.'}
               </p>
-              {!hasFilters && (
+              {!hasFilters && isAdmin && (
                 <Button onClick={openCreate} className="mt-5">
                   <PlusIcon weight="bold" /> Add facility
                 </Button>
@@ -254,13 +263,17 @@ export function FacilitiesPage() {
                     <Button asChild variant="outline" size="sm">
                       <Link to={`/reservations?facilityId=${facility.id}`}>Book</Link>
                     </Button>
-                    <Button variant="ghost" size="sm" className="ml-auto" onClick={() => openEdit(facility)}>
-                      Edit
-                    </Button>
-                    <ConfirmDelete
-                      description={`This deletes "${facility.name}". Facilities with reservations cannot be deleted.`}
-                      onConfirm={() => remove(facility)}
-                    />
+                    {isAdmin && (
+                      <>
+                        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => openEdit(facility)}>
+                          Edit
+                        </Button>
+                        <ConfirmDelete
+                          description={`This deletes "${facility.name}". Facilities with reservations cannot be deleted.`}
+                          onConfirm={() => remove(facility)}
+                        />
+                      </>
+                    )}
                   </div>
                 </li>
               ))}
@@ -277,18 +290,20 @@ export function FacilitiesPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Allowed gender</TableHead>
                   <TableHead>Allowed role</TableHead>
-                  <TableHead className="w-28">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
+                  {isAdmin && (
+                    <TableHead className="w-28">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loadError ? (
-                  <ErrorRow colSpan={6} message={loadError} />
+                  <ErrorRow colSpan={columnCount} message={loadError} />
                 ) : filteredFacilities === null ? (
-                  <LoadingRow colSpan={6} />
+                  <LoadingRow colSpan={columnCount} />
                 ) : filteredFacilities.length === 0 ? (
-                  <EmptyRow colSpan={6} message="No facilities found." />
+                  <EmptyRow colSpan={columnCount} message="No facilities found." />
                 ) : (
                   filteredFacilities.map((facility) => (
                     <TableRow key={facility.id}>
@@ -302,15 +317,17 @@ export function FacilitiesPage() {
                       </TableCell>
                       <TableCell>{facility.allowedGender}</TableCell>
                       <TableCell>{humanize(facility.allowedRole)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(facility)}>
-                          Edit
-                        </Button>
-                        <ConfirmDelete
-                          description={`This deletes "${facility.name}". Facilities with reservations cannot be deleted.`}
-                          onConfirm={() => remove(facility)}
-                        />
-                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(facility)}>
+                            Edit
+                          </Button>
+                          <ConfirmDelete
+                            description={`This deletes "${facility.name}". Facilities with reservations cannot be deleted.`}
+                            onConfirm={() => remove(facility)}
+                          />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}

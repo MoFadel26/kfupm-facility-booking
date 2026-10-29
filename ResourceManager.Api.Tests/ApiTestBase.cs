@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using ResourceManager.Api.DTO;
 using ResourceManager.Api.Models.Enums;
@@ -31,37 +32,59 @@ public abstract class ApiTestBase : IAsyncLifetime
         AllowedGender allowedGender = AllowedGender.Any,
         AllowedRole allowedRole = AllowedRole.Any)
     {
-        var response = await Client.PostAsJsonAsync("/api/facilities", new FacilityRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/facilities", ApiFixture.AdminKfupmId, new FacilityRequest
         {
             FacilityId = facilityId,
             Name = $"Facility {facilityId}",
             Type = FacilityType.Classroom,
             AllowedGender = allowedGender,
             AllowedRole = allowedRole
-        }, ApiFixture.Json);
+        });
 
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<FacilityResponse>(ApiFixture.Json))!;
     }
+
+    /// <summary>The password <see cref="CreateUserAsync"/> gives every user.</summary>
+    protected const string UserPassword = "user-password-1";
 
     protected async Task<UserResponse> CreateUserAsync(
         string kfupmId = "202300001",
         UserRole role = UserRole.Student,
         Gender gender = Gender.Male)
     {
-        var response = await Client.PostAsJsonAsync("/api/users", new UserRequest
+        var response = await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new CreateUserRequest
         {
             KfupmId = kfupmId,
             Name = $"User {kfupmId}",
             Email = $"s{kfupmId}@kfupm.edu.sa",
             Role = role,
-            Gender = gender
-        }, ApiFixture.Json);
+            Gender = gender,
+            Password = UserPassword
+        });
 
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<UserResponse>(ApiFixture.Json))!;
     }
 
+    /// <summary>Sends as the given user, or with no token at all when <paramref name="userId"/> is null.</summary>
+    protected Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, string? userId, object? body = null)
+        => SendWithTokenAsync(method, url, userId is null ? null : Fixture.CreateToken(userId), body);
+
+    /// <summary>Sends with the given token, or with none when <paramref name="token"/> is null.</summary>
+    protected Task<HttpResponseMessage> SendWithTokenAsync(HttpMethod method, string url, string? token, object? body = null)
+    {
+        // Per request rather than on Client.DefaultRequestHeaders: some tests fire requests
+        // concurrently, and some send them as different users.
+        var request = new HttpRequestMessage(method, url);
+        if (body is not null)
+            request.Content = JsonContent.Create(body, body.GetType(), options: ApiFixture.Json);
+        if (token is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return Client.SendAsync(request);
+    }
+
+    /// <summary><paramref name="userId"/> picks the token; the reservation belongs to whoever it names.</summary>
     protected Task<HttpResponseMessage> PostReservationAsync(
         DateTimeOffset startTime,
         DateTimeOffset endTime,
@@ -69,15 +92,14 @@ public abstract class ApiTestBase : IAsyncLifetime
         string userId = "202300001",
         string reason = "Project meeting",
         int targetParticipantCount = 2)
-        => Client.PostAsJsonAsync("/api/reservations", new CreateReservationRequest
+        => SendAsync(HttpMethod.Post, "/api/reservations", userId, new CreateReservationRequest
         {
             StartTime = startTime,
             EndTime = endTime,
             Reason = reason,
             TargetParticipantCount = targetParticipantCount,
-            FacilityId = facilityId,
-            UserId = userId
-        }, ApiFixture.Json);
+            FacilityId = facilityId
+        });
 
     protected Task<HttpResponseMessage> PutReservationAsync(
         Guid id,
@@ -85,15 +107,16 @@ public abstract class ApiTestBase : IAsyncLifetime
         DateTimeOffset endTime,
         ReservationStatus status = ReservationStatus.Pending,
         string reason = "Project meeting",
-        int targetParticipantCount = 2)
-        => Client.PutAsJsonAsync($"/api/reservations/{id}", new UpdateReservationRequest
+        int targetParticipantCount = 2,
+        string userId = "202300001")
+        => SendAsync(HttpMethod.Put, $"/api/reservations/{id}", userId, new UpdateReservationRequest
         {
             StartTime = startTime,
             EndTime = endTime,
             Reason = reason,
             TargetParticipantCount = targetParticipantCount,
             Status = status
-        }, ApiFixture.Json);
+        });
 
     protected static async Task<ReservationResponse> ReadReservationAsync(HttpResponseMessage response)
         => (await response.Content.ReadFromJsonAsync<ReservationResponse>(ApiFixture.Json))!;

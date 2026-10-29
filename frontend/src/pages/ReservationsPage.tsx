@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { PlusIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -42,7 +42,8 @@ import {
 } from '@/api/reservations'
 import { listAllFacilities } from '@/api/facilities'
 import { listAllUsers } from '@/api/users'
-import { errorMessage } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
+import { returnTo, useAuth } from '@/auth/useAuth'
 import { calculateDuration, formatRangeLines, fromInputValue, toInputValue } from '@/lib/datetime'
 import { validateReservation } from '@/lib/validation'
 import type { ReservationFormState } from '@/lib/validation'
@@ -62,7 +63,6 @@ const EMPTY_FORM: ReservationFormState = {
   reason: '',
   targetParticipantCount: '1',
   facilityId: '',
-  userId: '',
   status: 'Pending',
 }
 
@@ -78,6 +78,10 @@ function allowedStatusTransitions(current: ReservationStatus): ReservationStatus
 }
 
 export function ReservationsPage() {
+  const { user, isAdmin } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+
   const [reservations, setReservations] = useState<ReservationResponse[] | null>(null)
   const [page, setPage] = useState(1)
   const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
@@ -128,11 +132,34 @@ export function ReservationsPage() {
     listAllUsers().then(setUsers).catch(() => setUsers([]))
   }, [])
 
+  /** Sends a logged-out user to /login, to come back here afterwards. True if it did. */
+  function requireLogin() {
+    if (user) return false
+    navigate('/login', { state: returnTo(location) })
+    return true
+  }
+
+  /** A 401 means the session ended (the client has already cleared it): log in again. */
+  function showError(error: unknown) {
+    if (error instanceof ApiError && error.status === 401) {
+      toast.error('Your session has ended. Log in again.')
+      navigate('/login', { state: returnTo(location) })
+      return
+    }
+    toast.error(errorMessage(error))
+  }
+
   // A facility's "Book" link lands here with ?facilityId=<id>: open the form with it chosen.
+  // Logged out, it goes to /login first and comes back to the same link.
   const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
     const requested = searchParams.get('facilityId')
-    if (!requested || facilities.length === 0) return
+    if (!requested) return
+    if (!user) {
+      navigate('/login', { replace: true, state: returnTo(location) })
+      return
+    }
+    if (facilities.length === 0) return
     setSearchParams({}, { replace: true })
     const facility = facilities.find((f) => f.id === requested || f.facilityId === requested)
     if (!facility) return
@@ -140,9 +167,10 @@ export function ReservationsPage() {
     setForm({ ...EMPTY_FORM, facilityId: facility.facilityId })
     setFieldErrors({})
     setDialogOpen(true)
-  }, [facilities, searchParams, setSearchParams])
+  }, [facilities, searchParams, setSearchParams, user, navigate, location])
 
   function openCreate() {
+    if (requireLogin()) return
     setEditing(null)
     setForm({
       ...EMPTY_FORM,
@@ -153,6 +181,7 @@ export function ReservationsPage() {
   }
 
   function openEdit(reservation: ReservationResponse) {
+    if (requireLogin()) return
     setEditing(reservation)
     setForm({
       startTime: toInputValue(reservation.startTime),
@@ -160,7 +189,6 @@ export function ReservationsPage() {
       reason: reservation.reason,
       targetParticipantCount: String(reservation.targetParticipantCount),
       facilityId: reservation.facilityId,
-      userId: reservation.userId,
       status: reservation.status,
     })
     setFieldErrors({})
@@ -186,7 +214,6 @@ export function ReservationsPage() {
       } else {
         await createReservation({
           facilityId: form.facilityId,
-          userId: form.userId,
           startTime: fromInputValue(form.startTime),
           endTime: fromInputValue(form.endTime),
           reason: form.reason,
@@ -197,23 +224,25 @@ export function ReservationsPage() {
       setDialogOpen(false)
       await load()
     } catch (error) {
-      toast.error(errorMessage(error))
+      showError(error)
     } finally {
       setSaving(false)
     }
   }
 
   async function remove(reservation: ReservationResponse) {
+    if (requireLogin()) return
     try {
       await deleteReservation(reservation.id)
       toast.success(`Reservation "${reservation.reservationId}" deleted.`)
       await load()
     } catch (error) {
-      toast.error(errorMessage(error))
+      showError(error)
     }
   }
 
   async function quickStatusChange(reservation: ReservationResponse, newStatus: ReservationStatus) {
+    if (requireLogin()) return
     try {
       await updateReservation(reservation.id, {
         startTime: reservation.startTime,
@@ -225,7 +254,7 @@ export function ReservationsPage() {
       toast.success(`Reservation ${reservation.reservationId} set to ${newStatus}.`)
       await load()
     } catch (error) {
-      toast.error(errorMessage(error))
+      showError(error)
     }
   }
 
@@ -243,6 +272,8 @@ export function ReservationsPage() {
     : 'No reservations yet. Use New reservation to book a facility.'
 
   function renderActions(reservation: ReservationResponse) {
+    // Only the owner or an Admin may change a reservation; logged out, the actions lead to /login.
+    if (user && !isAdmin && reservation.userId !== user.kfupmId) return null
     return (
       <>
         {allowedStatusTransitions(reservation.status).map((target) => (
@@ -458,46 +489,24 @@ export function ReservationsPage() {
 
           <div className="grid gap-4">
             {!editing && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="reservation-facility">Facility</Label>
-                  <Select
-                    value={form.facilityId}
-                    onValueChange={(value) => setForm({ ...form, facilityId: value })}
-                  >
-                    <SelectTrigger id="reservation-facility" className="w-full">
-                      <SelectValue placeholder="Choose a facility" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {facilities.map((facility) => (
-                        <SelectItem key={facility.id} value={facility.facilityId}>
-                          {facility.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError message={fieldErrors.facilityId} />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="reservation-user">Booked by</Label>
-                  <Select
-                    value={form.userId}
-                    onValueChange={(value) => setForm({ ...form, userId: value })}
-                  >
-                    <SelectTrigger id="reservation-user" className="w-full">
-                      <SelectValue placeholder="Choose a person" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.kfupmId}>
-                          {user.name} ({user.kfupmId})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError message={fieldErrors.userId} />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="reservation-facility">Facility</Label>
+                <Select
+                  value={form.facilityId}
+                  onValueChange={(value) => setForm({ ...form, facilityId: value })}
+                >
+                  <SelectTrigger id="reservation-facility" className="w-full">
+                    <SelectValue placeholder="Choose a facility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {facilities.map((facility) => (
+                      <SelectItem key={facility.id} value={facility.facilityId}>
+                        {facility.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError message={fieldErrors.facilityId} />
               </div>
             )}
 

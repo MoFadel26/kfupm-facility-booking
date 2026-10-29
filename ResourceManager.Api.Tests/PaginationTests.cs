@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using ResourceManager.Api.DTO;
 using ResourceManager.Api.Models.Enums;
 
@@ -76,30 +75,32 @@ public class PaginationTests : ApiTestBase
     /// <summary>
     /// Offset paging is only stable if the sort key is unique. These users all share a name,
     /// so ordering by name alone leaves the database free to return them in a different
-    /// order per page — which shows up as a row appearing twice, or never.
+    /// order per page — which shows up as a row appearing twice, or never. The test admin
+    /// is a thirteenth user, so five pages of three cover them all.
     /// </summary>
     [Fact]
     public async Task Rows_sharing_a_sort_key_still_page_without_gaps_or_repeats()
     {
         for (var i = 0; i < 12; i++)
-            (await Client.PostAsJsonAsync("/api/users", new UserRequest
+            (await SendAsync(HttpMethod.Post, "/api/users", ApiFixture.AdminKfupmId, new CreateUserRequest
             {
                 KfupmId = $"2023000{i:00}",
                 Name = "Identical Name",
                 Email = $"user{i:00}@kfupm.edu.sa",
                 Role = UserRole.Student,
-                Gender = Gender.Male
-            }, ApiFixture.Json)).EnsureSuccessStatusCode();
+                Gender = Gender.Male,
+                Password = UserPassword
+            })).EnsureSuccessStatusCode();
 
         var seen = new List<Guid>();
-        for (var pageNumber = 1; pageNumber <= 4; pageNumber++)
+        for (var pageNumber = 1; pageNumber <= 5; pageNumber++)
         {
             var page = await GetPageAsync<UserResponse>($"/api/users?page={pageNumber}&pageSize=3");
             seen.AddRange(page.Items.Select(u => u.Id));
         }
 
-        Assert.Equal(12, seen.Count);
-        Assert.Equal(12, seen.Distinct().Count());
+        Assert.Equal(13, seen.Count);
+        Assert.Equal(13, seen.Distinct().Count());
     }
 
     [Theory]
