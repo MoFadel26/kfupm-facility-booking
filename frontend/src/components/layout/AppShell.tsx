@@ -1,16 +1,20 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   BuildingsIcon,
   CalendarBlankIcon,
   HouseIcon,
   ListIcon,
+  SignInIcon,
+  SignOutIcon,
   UserListIcon,
   UsersThreeIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { Button } from '@/components/ui/button'
+import { returnTo, useAuth } from '@/auth/useAuth'
+import { humanize } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -27,6 +31,42 @@ function AppName() {
       <div className="text-lg font-bold tracking-tight text-brand-ink">KFUPM</div>
       <div className="text-[0.8125rem] text-sidebar-foreground">Facility Booking</div>
     </div>
+  )
+}
+
+function AccountControls({ onNavigate }: { onNavigate: () => void }) {
+  const { user, logout } = useAuth()
+  const location = useLocation()
+  const onAuthPage = location.pathname === '/login' || location.pathname === '/register'
+
+  if (!user) {
+    return (
+      <Button asChild variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground">
+        <Link to="/login" state={onAuthPage ? undefined : returnTo(location)} onClick={onNavigate}>
+          <SignInIcon weight="bold" /> Log in
+        </Link>
+      </Button>
+    )
+  }
+
+  return (
+    <>
+      <div className="px-3 pb-1">
+        <div className="truncate text-sm font-semibold text-foreground">{user.name}</div>
+        <div className="text-[0.8125rem] text-muted-foreground">{humanize(user.role)}</div>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full justify-start text-sidebar-foreground"
+        onClick={() => {
+          logout()
+          onNavigate()
+        }}
+      >
+        <SignOutIcon weight="bold" /> Log out
+      </Button>
+    </>
   )
 }
 
@@ -90,7 +130,8 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="px-3 pb-4">
+        <div className="space-y-1 border-t border-sidebar-border px-3 pt-3 pb-4">
+          <AccountControls onNavigate={() => setMobileMenuOpen(false)} />
           <ThemeToggle />
         </div>
         <div className="brand-gradient h-1 shrink-0" aria-hidden="true" />

@@ -115,7 +115,6 @@ export interface CreateReservationRequest {
   reason: string
   targetParticipantCount: number
   facilityId: string
-  userId: string
 }
 
 export interface UpdateReservationRequest {

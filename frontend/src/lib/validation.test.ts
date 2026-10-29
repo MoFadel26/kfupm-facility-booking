@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   validateFacility,
+  validateLogin,
+  validateRegister,
   validateReservation,
   validateUser,
   type ReservationFormState,
 } from '@/lib/validation'
-import type { FacilityRequest, UserRequest } from '@/types/api'
+import type { FacilityRequest, RegisterRequest, UserRequest } from '@/types/api'
 
 describe('validateUser', () => {
   const valid: UserRequest = {
@@ -48,6 +50,40 @@ describe('validateUser', () => {
   })
 })
 
+describe('validateLogin', () => {
+  it('requires the KFUPM ID and password', () => {
+    expect(validateLogin({ kfupmId: 's202012345', password: 'x' })).toEqual({})
+    expect(validateLogin({ kfupmId: ' ', password: '' })).toEqual({
+      kfupmId: 'KFUPM ID is required.',
+      password: 'Password is required.',
+    })
+  })
+})
+
+describe('validateRegister', () => {
+  const valid: RegisterRequest = {
+    kfupmId: 's202012345',
+    name: 'Ali Hassan',
+    email: 'ali@kfupm.edu.sa',
+    gender: 'Male',
+    password: 'x'.repeat(8),
+  }
+
+  it('accepts a valid registration', () => {
+    expect(validateRegister(valid)).toEqual({})
+  })
+
+  it('applies the user field rules', () => {
+    expect(validateRegister({ ...valid, name: '' }).name).toBe('Name is required.')
+  })
+
+  it('requires a password of 8 to 128 characters', () => {
+    expect(validateRegister({ ...valid, password: 'x'.repeat(7) }).password).toBe('At least 8 characters.')
+    expect(validateRegister({ ...valid, password: 'x'.repeat(129) }).password).toBe('At most 128 characters.')
+    expect(validateRegister({ ...valid, password: 'x'.repeat(128) })).toEqual({})
+  })
+})
+
 describe('validateFacility', () => {
   const valid: FacilityRequest = {
     facilityId: 'B22-101',
@@ -83,7 +119,6 @@ describe('validateReservation', () => {
     reason: 'Study group',
     targetParticipantCount: '4',
     facilityId: 'f1',
-    userId: 'u1',
     status: 'Pending',
   }
 
@@ -91,11 +126,10 @@ describe('validateReservation', () => {
     expect(validateReservation(valid, false)).toEqual({})
   })
 
-  it('requires facility and user only when creating', () => {
-    const form = { ...valid, facilityId: '', userId: '' }
+  it('requires a facility only when creating', () => {
+    const form = { ...valid, facilityId: '' }
     expect(validateReservation(form, false)).toEqual({
       facilityId: 'Select a facility.',
-      userId: 'Select a user.',
     })
     expect(validateReservation(form, true)).toEqual({})
   })
