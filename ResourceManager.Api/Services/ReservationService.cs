@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using ResourceManager.Api.Data;
 using ResourceManager.Api.DTO;
@@ -208,6 +209,11 @@ public class ReservationService : IReservationService
             throw new ConflictException("The facility is already reserved during the requested time range.");
     }
 
+    /// <summary>
+    /// 16 hex digits, 64 random bits. The old 8 digits (32 bits) started colliding with the
+    /// unique index once the table held a few hundred thousand rows, and the booking failed
+    /// with a 409. At 64 bits a collision is unlikely before billions of rows.
+    /// </summary>
     private static string GenerateReservationId()
-        => $"RES-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+        => $"RES-{Convert.ToHexString(RandomNumberGenerator.GetBytes(8))}";
 }
