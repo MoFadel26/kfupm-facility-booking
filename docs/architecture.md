@@ -250,7 +250,8 @@ exists in `pg_constraint`.
 - **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
   Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
   been run.
-- **No frontend tests.**
+- **Few frontend tests.** Vitest covers the app shell, the date, label and validation
+  helpers, and the reservations page. The other pages have none.
 - **Known rough edges:** `Reservation` exposes `Status` as a settable field on the update
   DTO rather than `confirm`/`cancel` endpoints — that lands with auth, since the point of
   separate endpoints is separate policies.
