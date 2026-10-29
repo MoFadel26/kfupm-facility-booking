@@ -247,8 +247,9 @@ exists in `pg_constraint`.
   the database) is checked in the service. Nothing issues tokens yet — locally they come
   from `dotnet user-jwts` — and the frontend does not send them, so its booking and
   cancel calls now get `401`. Writes to users, facilities and participants are still open.
-- **Nothing deployed.** The app is configurable and containerised; choosing a host and
-  provisioning a database is what remains.
+- **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
+  Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
+  been run.
 - **No frontend tests.**
 - **Known rough edges:** `Reservation` exposes `Status` as a settable field on the update
   DTO rather than `confirm`/`cancel` endpoints — that lands with auth, since the point of

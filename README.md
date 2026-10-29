@@ -71,12 +71,20 @@ another server, set `TEST_POSTGRES_CONNECTION`.
 
 ## Deploy
 
-`ResourceManager.Api/Dockerfile` builds the API. Configure it with environment variables:
+`ResourceManager.Api/Dockerfile` builds the API image, with the repository root as the
+build context. [docs/deploy.md](docs/deploy.md) covers running it on Azure Container Apps
+and running the image locally. The frontend is not part of the image.
+
+Configure the API with environment variables:
 
 | Variable | Purpose |
 | --- | --- |
 | `ConnectionStrings__DefaultConnection` | Database. Required. |
 | `Cors__AllowedOrigins__0`, `__1`, … | Frontend origins. Required in Production. |
+| `Authentication__Schemes__Bearer__ValidIssuer` | Issuer expected in access tokens. |
+| `Authentication__Schemes__Bearer__ValidAudiences__0` | Audience expected in access tokens. |
+| `Authentication__Schemes__Bearer__SigningKeys__0__Issuer` | Issuer of the signing key; same as `ValidIssuer`. |
+| `Authentication__Schemes__Bearer__SigningKeys__0__Value` | Signing key, base64, 32 or more bytes. Secret. |
 | `ASPNETCORE_ENVIRONMENT` | `Production` turns off sample data and API docs, and logs JSON. |
 | `Database__MigrateOnStartup` | Default `true`. Set `false` when running more than one instance. |
 | `Database__SeedSampleData` | Default `false`. Seeds sample data outside Development. |
