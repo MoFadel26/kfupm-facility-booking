@@ -1,13 +1,12 @@
-# Image, deploy. Builds the API image, pushes it to GHCR and makes it the
-# running revision on Azure Container Apps. The one-time setup this relies on
-# (the container app, the federated credential, the three secrets) is in
-# docs/deploy.md.
+# Image, deploy. Builds the API image, pushes it to Artifact Registry and makes
+# it the running revision of the Cloud Run service. The one-time setup this
+# relies on (the service, the deploy service account, Workload Identity
+# Federation and the three repository variables) is in docs/deploy.md.
 #
 # Runs only when started by hand (Actions > deploy > Run workflow, or
-# gh workflow run deploy.yml), not on push. The Azure resources are not set up
-# yet, and a deploy that fires on every push would fail until they are. Run it
-# from main: the federated credential trusts main only. The tests are not run
-# here; the CI workflow runs them on every push to main.
+# gh workflow run deploy.yml), not on push. Run it from main: the Workload
+# Identity provider trusts main only. The tests are not run here; the CI
+# workflow runs them on every push to main.
 name: deploy
 
 on:
@@ -22,24 +21,36 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/mofadel26/kfupm-facility-booking
-  # Must match RESOURCE_GROUP and APP_NAME in infra/deploy.sh.
-  RESOURCE_GROUP: kfupm-facility-booking-rg
-  APP_NAME: kfupm-facility-booking
+  # Must match the names in docs/deploy.md.
+  REGION: me-central1
+  REPOSITORY: kfupm-facility-booking
+  SERVICE: kfupm-facility-booking
 
 jobs:
   image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      # Lets google-github-actions/auth exchange a GitHub-issued token for a
+      # Google one through Workload Identity Federation. No Google key is stored.
+      id-token: write
+    outputs:
+      image: ${{ steps.name.outputs.image }}
     steps:
       - uses: actions/checkout@v7
+      - id: name
+        run: echo "image=$REGION-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/$REPOSITORY/api:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          token_format: access_token
       - uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
       - uses: docker/setup-buildx-action@v4
       - uses: docker/build-push-action@v7
         with:
@@ -47,7 +58,7 @@ jobs:
           file: ResourceManager.Api/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          tags: ${{ steps.name.outputs.image }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -57,18 +68,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Lets azure/login exchange a GitHub-issued token for an Azure one
-      # through the federated credential. No Azure password is stored.
       id-token: write
     steps:
-      - uses: azure/login@v3
+      - uses: google-github-actions/auth@v3
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      # Changes the image only. Every other setting of the service (database,
+      # secrets, environment, probes) stays as set up in docs/deploy.md.
       - run: |
-          az extension add --name containerapp --upgrade --only-show-errors
-          az containerapp update \
-            --name "$APP_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --image "$IMAGE:$GITHUB_SHA"
+          gcloud run services update "$SERVICE" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "$REGION" \
+            --image "${{ needs.image.outputs.image }}"
