@@ -49,7 +49,7 @@ the console has.
 | Secret | `jwt-signing-key` | Output of `openssl rand -base64 48` |
 | Runtime service account | `kfupm-api-runtime` | Roles: Cloud SQL Client, Secret Manager Secret Accessor |
 | Cloud Run service | `kfupm-facility-booking` | See below. Also in `deploy.yml` |
-| Deploy service account | `github-deployer` | Roles on the project: Artifact Registry Writer, Cloud Run Developer, Firebase Hosting Admin. Service Account User on `kfupm-api-runtime` only |
+| Deploy service account | `github-deployer` | Roles on the project: Artifact Registry Writer, Cloud Run Developer, Firebase Hosting Admin, Service Usage Viewer (the Firebase CLI checks that the Hosting API is on before it deploys). Service Account User on `kfupm-api-runtime` only |
 | Workload Identity pool | `github` | Provider `github-actions`, see below |
 | Firebase Hosting site | `<project id>` | Serves `https://<project id>.web.app` and `https://<project id>.firebaseapp.com` |
 
