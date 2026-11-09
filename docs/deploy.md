@@ -40,7 +40,7 @@ the console has.
 | Thing | Name | Settings |
 |---|---|---|
 | Region | `me-central1` | Also in `deploy.yml` |
-| Artifact Registry repository | `kfupm-facility-booking` | Docker, `me-central1`. Cleanup policy: keep the 3 most recent versions |
+| Artifact Registry repository | `kfupm-facility-booking` | Docker, `me-central1`. Immutable tags off: with them on, cleanup cannot delete tagged images, and a re-run of the same commit cannot push. Cleanup policies, in "Delete artifacts" mode: `delete-all` (conditional delete, tag state any) and `keep-3` (keep the 3 most recent versions). Each build is one version, because the workflow turns off the provenance attestation |
 | Cloud SQL instance | `kfupm-facility-booking-db` | PostgreSQL 17, Enterprise edition, Sandbox preset, shared core (1 vCPU, 0.614 GB), 10 GB HDD, single zone, public IP with no authorized networks, no automated backups |
 | Database | `resource_manager` | |
 | Database user | `resourcemanager` | Built-in authentication, password of letters and digits only |

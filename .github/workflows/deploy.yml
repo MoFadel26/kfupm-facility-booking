@@ -59,6 +59,9 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.name.outputs.image }}
+          # One manifest per build, with no attestation beside it, so the
+          # repository's keep-the-last-3 cleanup policy counts builds.
+          provenance: false
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
