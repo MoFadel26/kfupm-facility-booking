@@ -1,5 +1,6 @@
-# Image, deploy. Builds the API image, pushes it to Artifact Registry and makes
-# it the running revision of the Cloud Run service. The one-time setup this
+# Image, deploy, frontend. Builds the API image, pushes it to Artifact Registry
+# and makes it the running revision of the Cloud Run service, then builds the
+# frontend and uploads it to Firebase Hosting. The one-time setup this
 # relies on (the service, the deploy service account, Workload Identity
 # Federation and the three repository variables) is in docs/deploy.md.
 #
@@ -72,6 +73,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      url: ${{ steps.url.outputs.url }}
     steps:
       - uses: google-github-actions/auth@v3
         with:
@@ -85,3 +88,40 @@ jobs:
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --region "$REGION" \
             --image "${{ needs.image.outputs.image }}"
+      - id: url
+        run: |
+          url=$(gcloud run services describe "$SERVICE" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "$REGION" \
+            --format 'value(status.url)')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  # Builds the frontend against the API's URL and uploads it to Firebase
+  # Hosting. Runs after the API deploy, so the frontend never calls an API
+  # older than itself.
+  frontend:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ needs.deploy.outputs.url }}
+      # The Firebase CLI reads the credentials file this step writes.
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - run: npx --yes firebase-tools@15 deploy --only hosting --project "${{ vars.GCP_PROJECT_ID }}" --non-interactive

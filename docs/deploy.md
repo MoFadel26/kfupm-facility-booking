@@ -20,10 +20,11 @@ GitHub Actions (deploy.yml) --Workload Identity Federation--> push image, update
 - `.github/workflows/deploy.yml` runs only when started by hand. It pushes
   `me-central1-docker.pkg.dev/<project id>/kfupm-facility-booking/api:<commit sha>`
   and points the Cloud Run service at it. Nothing else about the service
-  changes. The tests run in the CI workflow on every push to `main`.
+  changes. Then it builds the frontend against the service's URL and uploads
+  it to Firebase Hosting. The tests run in the CI workflow on every push to
+  `main`.
 - `frontend/firebase.json` serves `frontend/dist` and sends every path to
-  `index.html`, because the app routes in the browser. The frontend is
-  deployed by hand from a laptop; no workflow deploys it.
+  `index.html`, because the app routes in the browser.
 - Pending migrations are applied when the container starts
   (`Database:MigrateOnStartup` defaults to true). That is safe because the
   service is capped at one instance.
@@ -48,7 +49,7 @@ the console has.
 | Secret | `jwt-signing-key` | Output of `openssl rand -base64 48` |
 | Runtime service account | `kfupm-api-runtime` | Roles: Cloud SQL Client, Secret Manager Secret Accessor |
 | Cloud Run service | `kfupm-facility-booking` | See below. Also in `deploy.yml` |
-| Deploy service account | `github-deployer` | Roles on the project: Artifact Registry Writer, Cloud Run Developer. Service Account User on `kfupm-api-runtime` only |
+| Deploy service account | `github-deployer` | Roles on the project: Artifact Registry Writer, Cloud Run Developer, Firebase Hosting Admin. Service Account User on `kfupm-api-runtime` only |
 | Workload Identity pool | `github` | Provider `github-actions`, see below |
 | Firebase Hosting site | `<project id>` | Serves `https://<project id>.web.app` and `https://<project id>.firebaseapp.com` |
 
@@ -184,8 +185,8 @@ variables > Actions > Variables). None of them is secret.
 
     Open `https://<project id>.web.app` and sign in.
 
-From then on, running the workflow deploys the API at the commit it runs on.
-The frontend is deployed again with the two commands from step 11.
+From then on, running the workflow deploys the API and the frontend at the
+commit it runs on.
 
 ## Cost
 
