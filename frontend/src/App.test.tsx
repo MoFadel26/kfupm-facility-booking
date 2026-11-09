@@ -43,3 +43,16 @@ describe('App account controls', () => {
     expect(screen.queryByText('Ali Hassan')).toBeNull()
   })
 })
+
+describe('App source link', () => {
+  it('links to the GitHub repository in a new tab', () => {
+    renderApp('/foo')
+
+    const links = screen.getAllByRole('link', { name: /view source on github/i })
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      expect(link.getAttribute('href')).toBe('https://github.com/MoFadel26/kfupm-facility-booking')
+      expect(link.getAttribute('target')).toBe('_blank')
+    }
+  })
+})

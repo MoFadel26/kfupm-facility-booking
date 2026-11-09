@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   BuildingsIcon,
   CalendarBlankIcon,
+  GithubLogoIcon,
   HouseIcon,
   ListIcon,
   SignInIcon,
@@ -24,6 +25,8 @@ const NAV_ITEMS = [
   { to: '/participants', label: 'Participants', icon: UserListIcon },
   { to: '/users', label: 'Users', icon: UsersThreeIcon },
 ]
+
+const REPO_URL = 'https://github.com/MoFadel26/kfupm-facility-booking'
 
 function AppName() {
   return (
@@ -130,6 +133,14 @@ export function AppShell() {
           ))}
         </nav>
 
+        <div className="px-3 pb-3">
+          <Button asChild variant="outline" size="sm" className="w-full">
+            <a href={REPO_URL} target="_blank" rel="noreferrer">
+              <GithubLogoIcon weight="fill" /> View source on GitHub
+            </a>
+          </Button>
+        </div>
+
         <div className="space-y-1 border-t border-sidebar-border px-3 pt-3 pb-4">
           <AccountControls onNavigate={() => setMobileMenuOpen(false)} />
           <ThemeToggle />
@@ -151,6 +162,11 @@ export function AppShell() {
             </Button>
             <span className="text-base font-bold text-brand-ink">KFUPM</span>
             <span className="text-sm text-muted-foreground">Facility Booking</span>
+            <Button asChild variant="outline" size="icon-sm" className="ml-auto">
+              <a href={REPO_URL} target="_blank" rel="noreferrer" aria-label="View source on GitHub">
+                <GithubLogoIcon weight="fill" />
+              </a>
+            </Button>
           </div>
         </header>
 
