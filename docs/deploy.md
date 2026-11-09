@@ -1,185 +1,200 @@
 # Deploy
 
-Production is one container on Azure Container Apps, in front of Azure
-Database for PostgreSQL Flexible Server 16. The container serves the API
-only. The React app in `frontend/` is not deployed by any of this; it is
-hosted on its own origin and calls the API through CORS.
+Production runs on Google Cloud, in one project, in `me-central1` (Doha, the
+nearest region to Saudi Arabia that a normal account can use; Dammam,
+`me-central2`, needs billing through CNTXT):
+
+```
+browser --HTTPS--> Firebase Hosting   https://<project id>.web.app   (frontend/dist)
+   |
+   +----HTTPS--> Cloud Run service kfupm-facility-booking   (the API, port 8080)
+                   |-- Unix socket --> Cloud SQL for PostgreSQL kfupm-facility-booking-db
+                   |-- at start -----> Secret Manager: db-connection, jwt-signing-key
+                   +-- image from ---> Artifact Registry kfupm-facility-booking/api
+
+GitHub Actions (deploy.yml) --Workload Identity Federation--> push image, update service
+```
 
 - `ResourceManager.Api/Dockerfile` builds the image, with the repository root
-  as the build context. The .NET SDK publishes the API, and the image runs it
-  on port 8080 as a non-root user.
+  as the build context. The image runs the API on port 8080 as a non-root user.
 - `.github/workflows/deploy.yml` runs only when started by hand. It pushes
-  `ghcr.io/mofadel26/kfupm-facility-booking:<commit sha>` and points the
-  container app at it. It does not run on push, so nothing is deployed until
-  the setup below is done and someone runs it. The tests run in the CI
-  workflow on every push to `main`, not in this one.
-- `infra/deploy.sh` creates or updates the Azure resources. It is safe to
-  run again. Region and names are variables at its top; the resource group
-  and app name are repeated in the workflow and must match.
+  `me-central1-docker.pkg.dev/<project id>/kfupm-facility-booking/api:<commit sha>`
+  and points the Cloud Run service at it. Nothing else about the service
+  changes. The tests run in the CI workflow on every push to `main`.
+- `frontend/firebase.json` serves `frontend/dist` and sends every path to
+  `index.html`, because the app routes in the browser. The frontend is
+  deployed by hand from a laptop; no workflow deploys it.
 - Pending migrations are applied when the container starts
-  (`Database:MigrateOnStartup` defaults to true). That is safe because the app
-  never runs as more than one replica.
-- `/health/ready` answers 200 when the database answers, 503 when not. The
-  startup and readiness probes call it. `/health/live` checks nothing; the
-  liveness probe calls it, so a database outage takes the replica out of
-  rotation instead of restarting it over and over.
+  (`Database:MigrateOnStartup` defaults to true). That is safe because the
+  service is capped at one instance.
+- The startup probe calls `/health/ready`, which answers 200 when the
+  database answers. The liveness probe calls `/health/live`, which checks
+  nothing, so a database outage does not restart the container over and over.
 
-The first migration runs `CREATE EXTENSION btree_gist` for the reservation
-overlap constraint. Flexible Server only allows extensions on its
-`azure.extensions` list, so `infra/deploy.sh` sets that list to `BTREE_GIST`
-before the app starts.
+The first migration runs `CREATE EXTENSION btree_gist`. Cloud SQL allows it
+for any user with the `cloudsqlsuperuser` role, which every user created in
+the console has.
 
-## Configuration
+## Names and settings
 
-Every setting the container reads comes from its environment. Nothing secret
-is in `appsettings*.json` or in the image.
-
-| Variable | Set by | Value |
+| Thing | Name | Settings |
 |---|---|---|
-| `ConnectionStrings__DefaultConnection` | `infra/deploy.sh`, as the Container Apps secret `db-connection` | Npgsql connection string with `SSL Mode=VerifyFull` |
-| `Cors__AllowedOrigins__0` | `infra/deploy.sh`, from `CORS_ORIGIN` | The frontend's origin. Production refuses to start without one |
-| `Authentication__Schemes__Bearer__ValidIssuer` | `infra/deploy.sh`, from `JWT_ISSUER` | Issuer the API puts in the tokens it issues and expects in access tokens. Production refuses to start without one |
-| `Authentication__Schemes__Bearer__ValidAudiences__0` | `infra/deploy.sh`, from `JWT_AUDIENCE` | Audience the API puts in its tokens and expects. Production refuses to start without one |
-| `Authentication__Schemes__Bearer__SigningKeys__0__Issuer` | `infra/deploy.sh`, from `JWT_ISSUER` | Issuer the signing key belongs to |
-| `Authentication__Schemes__Bearer__SigningKeys__0__Value` | `infra/deploy.sh`, from `JWT_SIGNING_KEY`, as the Container Apps secret `jwt-signing-key` | Base64, 32 or more bytes. Signs and checks access tokens. Production refuses to start without one |
-| `Database__SeedSampleData` | `infra/deploy.sh`, from `SEED_SAMPLE_DATA`, only if set | `true` seeds the sample facilities and users. Default `false` |
-| `ApiDocs__Enabled` | `infra/deploy.sh`, from `API_DOCS`, only if set | `true` serves the OpenAPI document and the Scalar docs. Default `false` |
-| `Bootstrap__AdminKfupmId` | `infra/deploy.sh`, from `ADMIN_KFUPM_ID`, only if set | The KFUPM id that registers as an admin. Without it, nobody can become an admin |
-| `RateLimiting__Auth__PermitLimit` | not set; default `5` | Login and register attempts per client address per minute. The address comes from the ingress's `X-Forwarded-For` |
-| `ForwardedHeaders__KnownNetworks__0` to `__3` | `infra/deploy.sh` | The platform-reserved ranges `100.100.0.0/17`, `100.100.128.0/19`, `100.100.160.0/19`, `100.100.192.0/19`. `X-Forwarded-For` is believed only from these senders |
-| `Database__MigrateOnStartup` | not set; default `true` | Applies pending migrations before the app starts |
+| Region | `me-central1` | Also in `deploy.yml` |
+| Artifact Registry repository | `kfupm-facility-booking` | Docker, `me-central1`. Cleanup policy: keep the 3 most recent versions |
+| Cloud SQL instance | `kfupm-facility-booking-db` | PostgreSQL 17, Enterprise edition, Sandbox preset, shared core (1 vCPU, 0.614 GB), 10 GB HDD, single zone, public IP with no authorized networks, no automated backups |
+| Database | `resource_manager` | |
+| Database user | `resourcemanager` | Built-in authentication, password of letters and digits only |
+| Secret | `db-connection` | `Host=/cloudsql/<project id>:me-central1:kfupm-facility-booking-db;Database=resource_manager;Username=resourcemanager;Password=<password>` |
+| Secret | `jwt-signing-key` | Output of `openssl rand -base64 48` |
+| Runtime service account | `kfupm-api-runtime` | Roles: Cloud SQL Client, Secret Manager Secret Accessor |
+| Cloud Run service | `kfupm-facility-booking` | See below. Also in `deploy.yml` |
+| Deploy service account | `github-deployer` | Roles on the project: Artifact Registry Writer, Cloud Run Developer. Service Account User on `kfupm-api-runtime` only |
+| Workload Identity pool | `github` | Provider `github-actions`, see below |
+| Firebase Hosting site | `<project id>` | Serves `https://<project id>.web.app` and `https://<project id>.firebaseapp.com` |
+
+The connection string has no `SSL Mode`. The Unix socket goes to the Cloud
+SQL Auth Proxy that Cloud Run runs next to the container, and the proxy
+encrypts the connection to the instance.
+
+### Cloud Run service
+
+- Container image: the one the workflow pushed. Container port `8080`.
+- Ingress: All. Authentication: allow public access.
+- CPU 1, memory 512 MiB, CPU only during requests. Minimum instances 0,
+  maximum instances 1.
+- Security: service account `kfupm-api-runtime`.
+- Cloud SQL connections: `<project id>:me-central1:kfupm-facility-booking-db`.
+- Startup probe: HTTP `/health/ready`, port 8080, initial delay 10 s,
+  period 10 s, timeout 5 s, failure threshold 10.
+- Liveness probe: HTTP `/health/live`, port 8080, period 10 s, timeout 5 s,
+  failure threshold 3.
+
+| Variable | Source | Value |
+|---|---|---|
+| `ConnectionStrings__DefaultConnection` | secret `db-connection`, latest | |
+| `Authentication__Schemes__Bearer__SigningKeys__0__Value` | secret `jwt-signing-key`, latest | Base64, 32 or more bytes. Production refuses to start without one |
+| `Authentication__Schemes__Bearer__ValidIssuer` | plain | `kfupm-facility-booking`. Production refuses to start without one |
+| `Authentication__Schemes__Bearer__SigningKeys__0__Issuer` | plain | Same as `ValidIssuer` |
+| `Authentication__Schemes__Bearer__ValidAudiences__0` | plain | `kfupm-facility-booking-web`. Production refuses to start without one |
+| `Cors__AllowedOrigins__0` | plain | `https://<project id>.web.app`. Production refuses to start without one |
+| `Cors__AllowedOrigins__1` | plain | `https://<project id>.firebaseapp.com` |
+| `ForwardedHeaders__KnownNetworks__0` | plain | `0.0.0.0/0` |
+| `ForwardedHeaders__KnownNetworks__1` | plain | `::/0` |
+| `Database__SeedSampleData` | plain, optional | `true` seeds the sample facilities and users |
+| `ApiDocs__Enabled` | plain, optional | `true` serves the OpenAPI document and the Scalar docs |
+| `Bootstrap__AdminKfupmId` | plain, optional | The KFUPM id that registers as an admin. Without it, nobody can become an admin |
+| `RateLimiting__Auth__PermitLimit` | not set; default `5` | Login and register attempts per client address per minute |
+| `Database__MigrateOnStartup` | not set; default `true` | |
 | `ASPNETCORE_HTTP_PORTS` | `Dockerfile` | `8080` |
 | `ASPNETCORE_ENVIRONMENT` | .NET image default | `Production` |
+
+`ForwardedHeaders__KnownNetworks` trusts `X-Forwarded-For` from every sender.
+A Cloud Run service has no network path except through Google's front end,
+so every sender is that front end. Google does not document the address the
+front end connects from, which is why no narrower range is set. The API
+takes only the last entry of the header. Google does not document either
+that its front end appends the client address as the last entry; step 10 of
+the setup checks both.
 
 `ASPNETCORE_HTTPS_PORT` is not set, on purpose. Outside Development the app
 calls `UseHttpsRedirection`, and without a known HTTPS port that does nothing.
 With one set, it would redirect every request, because every request reaches
-the container as plain HTTP: the ingress ends TLS, and the probes call port
-8080 directly. The ingress has `allowInsecure: false`, so it redirects HTTP
-to HTTPS at the edge.
+the container as plain HTTP: Cloud Run ends TLS in front of it.
 
-`infra/deploy.sh` itself reads:
+### Workload Identity Federation
 
-| Variable | Required | Value |
-|---|---|---|
-| `PG_ADMIN_PASSWORD` | always | 16 or more letters and digits. Use the same value on every run; the server is set to it |
-| `IMAGE` | first run | Image to run. Later runs keep the running one unless this is set |
-| `CORS_ORIGIN` | always | The frontend's origin, e.g. `https://example.com`. `http://localhost:5173` until the frontend is hosted |
-| `JWT_ISSUER` | always | Becomes the valid issuer and the signing key's issuer |
-| `JWT_AUDIENCE` | always | Becomes the valid audience |
-| `JWT_SIGNING_KEY` | always | Base64, 32 or more bytes (`openssl rand -base64 48`). Use the same value on every run, or tokens signed with the old key stop working |
-| `SEED_SAMPLE_DATA` | no, but pass it on every run once set | Becomes `Database__SeedSampleData`. A run without it turns it off |
-| `API_DOCS` | no, but pass it on every run once set | Becomes `ApiDocs__Enabled`. A run without it turns it off |
-| `ADMIN_KFUPM_ID` | no, but pass it on every run once set | Becomes `Bootstrap__AdminKfupmId`. A run without it turns it off |
+The workflow signs in as `github-deployer` with a token GitHub issues to the
+run. No Google key is stored anywhere.
 
-The script replaces the app's secrets and environment on every run, which is
-why the optional values have to be passed again.
+- Pool `github`, provider `github-actions`, type OpenID Connect, issuer
+  `https://token.actions.githubusercontent.com`.
+- Attribute mapping: `google.subject` = `assertion.sub`,
+  `attribute.repository` = `assertion.repository`.
+- Attribute condition:
+  `assertion.repository_id == '796713235' && assertion.ref == 'refs/heads/main'`.
+  The repository id does not change if the repository is renamed.
+- On `github-deployer`, grant Workload Identity User to
+  `principalSet://iam.googleapis.com/projects/<project number>/locations/global/workloadIdentityPools/github/attribute.repository/MoFadel26/kfupm-facility-booking`.
 
-The workflow reads three repository secrets: `AZURE_CLIENT_ID`,
-`AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`. They identify the Azure
-identity it signs in as through OpenID Connect; no Azure password is stored
-anywhere.
+The workflow reads three repository variables (Settings > Secrets and
+variables > Actions > Variables). None of them is secret.
+
+| Variable | Value |
+|---|---|
+| `GCP_PROJECT_ID` | The project id |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<project number>/locations/global/workloadIdentityPools/github/providers/github-actions` |
+| `GCP_DEPLOY_SERVICE_ACCOUNT` | `github-deployer@<project id>.iam.gserviceaccount.com` |
 
 ## One-time setup
 
-Needs the Azure CLI and the GitHub CLI, both signed in.
-
-1. Pick the subscription and create the resource group:
-
-   ```sh
-   az login
-   az account set --subscription "<subscription name or id>"
-   az group create --name kfupm-facility-booking-rg --location centralindia
-   ```
-
-2. Create the identity the workflow signs in as, trust GitHub's tokens for
-   runs on `main`, and give it Contributor on the resource group only. The
-   subject carries the account and repository IDs (`@101219769`,
-   `@796713235`) because that is the form GitHub puts in the token; the
-   failed `azure/login` step prints it as "subject claim" if it differs.
-
-   ```sh
-   SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-   TENANT_ID=$(az account show --query tenantId -o tsv)
-   APP_ID=$(az ad app create --display-name kfupm-facility-booking-github --query appId -o tsv)
-   az ad sp create --id "$APP_ID"
-   az ad app federated-credential create --id "$APP_ID" --parameters '{
-     "name": "github-main",
-     "issuer": "https://token.actions.githubusercontent.com",
-     "subject": "repo:MoFadel26@101219769/kfupm-facility-booking@796713235:ref:refs/heads/main",
-     "audiences": ["api://AzureADTokenExchange"]
-   }'
-   az role assignment create --assignee "$APP_ID" --role Contributor \
-     --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/kfupm-facility-booking-rg"
-   gh secret set AZURE_CLIENT_ID --body "$APP_ID"
-   gh secret set AZURE_TENANT_ID --body "$TENANT_ID"
-   gh secret set AZURE_SUBSCRIPTION_ID --body "$SUBSCRIPTION_ID"
-   ```
-
-3. Run the workflow on `main` and wait for it:
+1. Create the Google Cloud account (free trial) and a project. Add a budget
+   with email alerts.
+2. Enable the APIs: Cloud Run Admin, Artifact Registry, Cloud SQL Admin,
+   Secret Manager, IAM Service Account Credentials, Security Token Service.
+3. Create the Artifact Registry repository.
+4. Create the Cloud SQL instance, then the database and the user. The
+   instance takes about 10 minutes.
+5. Create the two secrets.
+6. Create `kfupm-api-runtime` and give it its roles.
+7. Create `github-deployer`, the Workload Identity pool and provider, and
+   the three repository variables.
+8. Run the workflow on `main`:
 
    ```sh
    gh workflow run deploy.yml --ref main
    gh run watch
    ```
 
-   The image job pushes the first image. The deploy job fails this one
-   time, because the container app does not exist until step 5.
+   The image job pushes the first image. The deploy job fails this one time,
+   because the service does not exist until step 9.
 
-4. Make the image public so Container Apps can pull it without a
-   credential. Open
-   `https://github.com/users/MoFadel26/packages/container/kfupm-facility-booking/settings`,
-   then "Change visibility" and choose Public. GitHub has no CLI or API for
-   this. The image contains no secrets.
+9. Create the Cloud Run service from that image with the settings above.
+   The first start applies the migrations. Check it with
+   `curl https://<service url>/health/ready`, which answers `Healthy`.
+   Then re-run the failed deploy job so the run goes green:
+   `gh run rerun --failed`.
 
-5. Create the database, the Container Apps environment and the app:
+10. Check that the sign-in rate limit tells clients apart and cannot be
+    dodged. From one machine, send six failed logins inside a minute, each
+    with a different made-up `X-Forwarded-For`:
 
-   ```sh
-   export PG_ADMIN_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)
-   echo "$PG_ADMIN_PASSWORD"    # store it; every later run needs the same value
-   export JWT_SIGNING_KEY=$(openssl rand -base64 48)
-   echo "$JWT_SIGNING_KEY"      # store it; every later run needs the same value
-   export IMAGE=ghcr.io/mofadel26/kfupm-facility-booking:$(git rev-parse origin/main)
-   export CORS_ORIGIN=http://localhost:5173
-   export JWT_ISSUER=<issuer>
-   export JWT_AUDIENCE=<audience>
-   export SEED_SAMPLE_DATA=true   # optional
-   export API_DOCS=true           # optional
-   export ADMIN_KFUPM_ID=<KFUPM id>   # optional; registers as an admin
-   infra/deploy.sh
-   ```
+    ```sh
+    for i in 1 2 3 4 5 6; do
+      curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<service url>/api/auth/login \
+        -H "X-Forwarded-For: 203.0.113.$i" \
+        -H 'Content-Type: application/json' -d '{"kfupmId":"0","password":"x"}'
+    done
+    ```
 
-   The last line it prints is the app's URL. The first start applies the
-   migrations, so the first request can take a minute. Check it with
-   `curl https://<app url>/health/ready`, which answers `Healthy`.
+    The sixth answers `429`; if it answers `401`, the API is reading an
+    address the client chose, so remove the two `KnownNetworks` variables.
+    Then, within that minute, log in from a different network (a phone off
+    Wi-Fi). It should answer `401` or `200`, not `429`.
 
-6. Re-run the deploy job from step 3 so the run goes green. It sets the
-   image that is already running.
+11. Add Firebase to the project (console.firebase.google.com > Add project >
+    pick the existing project), then build and deploy the frontend from
+    `frontend/`:
 
-   ```sh
-   gh run rerun --failed
-   ```
+    ```sh
+    npm ci
+    VITE_API_BASE_URL=https://<service url> npm run build
+    npx firebase-tools@15 login
+    npx firebase-tools@15 deploy --only hosting --project <project id>
+    ```
 
-7. Check that the sign-in rate limit tells clients apart. Microsoft does not
-   document the address the ingress proxy connects from, so this confirms the
-   ranges above cover it. From one machine, send six failed logins inside a
-   minute:
+    Open `https://<project id>.web.app` and sign in.
 
-   ```sh
-   for i in 1 2 3 4 5 6; do
-     curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<app url>/api/auth/login \
-       -H 'Content-Type: application/json' -d '{"kfupmId":"0","password":"x"}'
-   done
-   ```
+From then on, running the workflow deploys the API at the commit it runs on.
+The frontend is deployed again with the two commands from step 11.
 
-   The sixth answers `429`. Then, within that minute, log in from a different
-   network (a phone off Wi-Fi). It should answer `401` or `200`, not `429`. A
-   `429` there means the proxy's address is outside the trusted ranges, so all
-   clients share one limit: find the address the requests arrive from and set
-   `ForwardedHeaders__KnownNetworks` to cover it. The failure is a limit that
-   is too strict, never one that can be dodged.
+## Cost
 
-From then on, running the workflow deploys the commit it runs on.
+The free trial gives $300 for 90 days. Cloud SQL is the only part that
+charges from the first hour, about $10 a month for the settings above,
+whether or not anyone uses it; stopping the instance stops the compute
+charge. Cloud Run, Artifact Registry (0.5 GB), Secret Manager and Firebase
+Hosting stay inside their free monthly amounts at this traffic. When the
+trial ends, the resources stop until the account is upgraded to a paid one.
 
 ## Running the image locally
 

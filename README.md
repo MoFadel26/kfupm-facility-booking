@@ -96,7 +96,7 @@ another server, set `TEST_POSTGRES_CONNECTION`.
 ## Deploy
 
 `ResourceManager.Api/Dockerfile` builds the API image, with the repository root as the
-build context. [docs/deploy.md](docs/deploy.md) covers running it on Azure Container Apps
+build context. [docs/deploy.md](docs/deploy.md) covers running it on Google Cloud Run
 and running the image locally. The frontend is not part of the image.
 
 Configure the API with environment variables:

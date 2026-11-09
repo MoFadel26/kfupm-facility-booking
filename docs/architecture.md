@@ -263,9 +263,8 @@ makes a demotion apply on the next request.
   multiplies with replicas, and many users behind one NAT share it. There is no refresh
   token and no self-service password reset; an admin sets or resets passwords. Writes to
   participants are still open.
-- **Nothing deployed.** `infra/deploy.sh` and the manual `deploy` workflow target Azure
-  Container Apps and PostgreSQL Flexible Server ([deploy.md](deploy.md)); neither has
-  been run.
+- **Nothing deployed.** The manual `deploy` workflow targets Google Cloud Run and Cloud
+  SQL ([deploy.md](deploy.md)); it has not been run.
 - **Few frontend tests.** Vitest covers the app shell, the date, label and validation
   helpers, and the reservations page. The other pages have none.
 - **Known rough edges:** `Reservation` exposes `Status` as a settable field on the update

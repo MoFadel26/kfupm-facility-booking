@@ -150,8 +150,8 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// Behind Container Apps' ingress every request arrives from the proxy, so the rate limiter
-// would put all clients in one bucket. The ingress appends the real client address to
+// Behind a proxy every request arrives from the proxy, so the rate limiter
+// would put all clients in one bucket. The proxy appends the real client address to
 // X-Forwarded-For, and with the default ForwardLimit of 1 only that last entry is used.
 // The header is trusted only from the networks in ForwardedHeaders:KnownNetworks (plus
 // loopback, the framework default). From any other sender it is ignored, so a client that
