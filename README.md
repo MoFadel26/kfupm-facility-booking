@@ -3,6 +3,11 @@
 Facility booking for KFUPM. Users book shared spaces (classrooms, labs, the pool,
 courts, the gym) for a time slot and invite others to join.
 
+**Live:** [kfupm-booking-platform.web.app](https://kfupm-booking-platform.web.app) ·
+API: [kfupm-facility-booking-1024353700399.me-central1.run.app](https://kfupm-facility-booking-1024353700399.me-central1.run.app/scalar)
+(API docs at `/scalar`). It runs on Google Cloud: Firebase Hosting, Cloud Run and Cloud
+SQL in `me-central1` (Doha).
+
 ## Rules
 
 - Two active reservations for the same facility cannot overlap. A booking ending
