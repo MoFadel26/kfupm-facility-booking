@@ -106,4 +106,25 @@ public class ParticipantAuthTests : ApiTestBase
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
+
+    /// <summary>
+    /// The capacity check counts the participants and then inserts. Without a lock, joins
+    /// that arrive together all count the same free seat and all get in.
+    /// </summary>
+    [Fact]
+    public async Task Concurrent_joins_do_not_overfill_a_reservation()
+    {
+        var reservationId = await OwnersReservationAsync(targetParticipantCount: 1);
+        var joiners = Enumerable.Range(10, 8).Select(i => $"2023000{i}").ToArray();
+        foreach (var joiner in joiners)
+            await CreateUserAsync(joiner);
+
+        var responses = await Task.WhenAll(joiners.Select(j => JoinAsync(j, j, reservationId)));
+
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Created);
+        Assert.All(responses.Where(r => r.StatusCode != HttpStatusCode.Created),
+            r => Assert.Equal(HttpStatusCode.Conflict, r.StatusCode));
+        Assert.Equal(1, await Fixture.QueryAsync(db =>
+            db.EventParticipants.CountAsync(ep => ep.ReservationId == reservationId)));
+    }
 }

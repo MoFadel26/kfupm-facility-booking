@@ -50,6 +50,13 @@ public class EventParticipantService : IEventParticipantService
 
     public async Task<EventParticipantResponse> CreateAsync(CreateEventParticipantRequest request, string actingUserId, CancellationToken ct = default)
     {
+        // The capacity check below counts and then inserts. Joins that arrive together would
+        // all count the same free seat, so each one locks the reservation row first and they
+        // take turns. The lock is held until the transaction commits.
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _db.Database.ExecuteSqlAsync(
+            $"""SELECT 1 FROM "Reservations" WHERE "ReservationId" = {request.ReservationId} FOR UPDATE""", ct);
+
         var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.KfupmId == request.UserId, ct)
                    ?? throw new NotFoundException(nameof(User), request.UserId);
 
@@ -75,6 +82,7 @@ public class EventParticipantService : IEventParticipantService
         var participant = new EventParticipant(request.UserId, request.ReservationId);
         _db.EventParticipants.Add(participant);
         await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return await GetByIdAsync(participant.Id, ct);
     }
 
