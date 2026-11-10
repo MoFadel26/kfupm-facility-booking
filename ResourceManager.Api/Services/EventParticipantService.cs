@@ -48,7 +48,7 @@ public class EventParticipantService : IEventParticipantService
             ?? throw new NotFoundException(nameof(EventParticipant), id);
     }
 
-    public async Task<EventParticipantResponse> CreateAsync(CreateEventParticipantRequest request, CancellationToken ct = default)
+    public async Task<EventParticipantResponse> CreateAsync(CreateEventParticipantRequest request, string actingUserId, CancellationToken ct = default)
     {
         var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.KfupmId == request.UserId, ct)
                    ?? throw new NotFoundException(nameof(User), request.UserId);
@@ -57,6 +57,8 @@ public class EventParticipantService : IEventParticipantService
                               .Include(r => r.Facility)
                               .FirstOrDefaultAsync(r => r.ReservationId == request.ReservationId, ct)
                           ?? throw new NotFoundException(nameof(Reservation), request.ReservationId);
+
+        await EnsureCanManageAsync(request.UserId, reservation.UserId, actingUserId, ct);
 
         if (reservation.Status == ReservationStatus.Cancelled)
             throw new ConflictException("Cannot join a cancelled reservation.");
@@ -76,12 +78,29 @@ public class EventParticipantService : IEventParticipantService
         return await GetByIdAsync(participant.Id, ct);
     }
 
-    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid id, string actingUserId, CancellationToken ct = default)
     {
-        var participant = await _db.EventParticipants.FirstOrDefaultAsync(ep => ep.Id == id, ct)
+        var participant = await _db.EventParticipants.Include(ep => ep.Reservation)
+                              .FirstOrDefaultAsync(ep => ep.Id == id, ct)
                           ?? throw new NotFoundException(nameof(EventParticipant), id);
+
+        await EnsureCanManageAsync(participant.UserId, participant.Reservation.UserId, actingUserId, ct);
 
         _db.EventParticipants.Remove(participant);
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// A user may add or remove themselves. The reservation's owner and admins may add or
+    /// remove anyone.
+    /// </summary>
+    private async Task EnsureCanManageAsync(string participantUserId, string reservationOwnerId, string actingUserId, CancellationToken ct)
+    {
+        if (actingUserId == participantUserId || actingUserId == reservationOwnerId)
+            return;
+
+        if (!await UserService.IsAdminAsync(_db, actingUserId, ct))
+            throw new ForbiddenException(
+                "Only the participant, the reservation's owner or an admin can add or remove a participant.");
     }
 }

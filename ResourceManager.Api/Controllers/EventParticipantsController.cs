@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ResourceManager.Api.DTO;
 using ResourceManager.Api.Services;
@@ -30,23 +31,31 @@ public class EventParticipantsController : ControllerBase
     public async Task<ActionResult<EventParticipantResponse>> GetById(Guid id, CancellationToken ct)
         => Ok(await _eventParticipantService.GetByIdAsync(id, ct));
 
+    /// <summary>Adds a participant. A user may add themselves; the reservation's owner and admins may add anyone.</summary>
     [HttpPost]
+    [Authorize]
     [ProducesResponseType(typeof(EventParticipantResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<EventParticipantResponse>> Create(CreateEventParticipantRequest request, CancellationToken ct)
     {
-        var participant = await _eventParticipantService.CreateAsync(request, ct);
+        var participant = await _eventParticipantService.CreateAsync(request, User.GetKfupmId(), ct);
         return CreatedAtAction(nameof(GetById), new { id = participant.Id }, participant);
     }
 
+    /// <summary>Removes a participant. Allowed for the participant, the reservation's owner and admins.</summary>
     [HttpDelete("{id:guid}")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await _eventParticipantService.DeleteAsync(id, ct);
+        await _eventParticipantService.DeleteAsync(id, User.GetKfupmId(), ct);
         return NoContent();
     }
 }

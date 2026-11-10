@@ -4,6 +4,7 @@ using ResourceManager.Api.Data;
 using ResourceManager.Api.DTO;
 using ResourceManager.Api.Exceptions;
 using ResourceManager.Api.Models;
+using ResourceManager.Api.Models.Enums;
 
 namespace ResourceManager.Api.Services;
 
@@ -35,6 +36,13 @@ public class UserService : IUserService
             .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException(nameof(User), id);
     }
+
+    /// <summary>
+    /// Read from the Users table rather than a token claim, so demoting someone takes
+    /// effect on their next request.
+    /// </summary>
+    internal static Task<bool> IsAdminAsync(AppDbContext db, string kfupmId, CancellationToken ct)
+        => db.Users.AnyAsync(u => u.KfupmId == kfupmId && u.Role == UserRole.Admin, ct);
 
     public async Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {

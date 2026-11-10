@@ -79,12 +79,12 @@ public class ResponseProjectionTests : ApiTestBase
         await ArrangeAsync();
         var reservation = (await GetPageAsync<ReservationResponse>("/api/reservations")).Items[0];
 
-        var created = await Client.PostAsJsonAsync("/api/eventparticipants",
+        var created = await SendAsync(HttpMethod.Post, "/api/eventparticipants", "202300001",
             new CreateEventParticipantRequest
             {
                 UserId = "202300001",
                 ReservationId = reservation.ReservationId
-            }, ApiFixture.Json);
+            });
         created.EnsureSuccessStatusCode();
 
         var participants = await GetPageAsync<EventParticipantResponse>("/api/eventparticipants");
