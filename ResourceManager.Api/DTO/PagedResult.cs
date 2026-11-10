@@ -27,7 +27,8 @@ public class PageQuery
     public const int MaxPageSize = 100;
     public const int DefaultPageSize = 25;
 
-    [Range(1, int.MaxValue)]
+    // Capped so the offset, (Page - 1) * PageSize, cannot overflow an int.
+    [Range(1, int.MaxValue / MaxPageSize)]
     public int Page { get; set; } = 1;
 
     [Range(1, MaxPageSize)]

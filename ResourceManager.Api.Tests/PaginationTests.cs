@@ -108,6 +108,7 @@ public class PaginationTests : ApiTestBase
     [InlineData("page=-1")]
     [InlineData("pageSize=0")]
     [InlineData("pageSize=101")] // above PageQuery.MaxPageSize
+    [InlineData("page=100000000")] // (page - 1) * pageSize overflows an int
     public async Task Nonsensical_paging_parameters_are_rejected(string query)
     {
         var response = await Client.GetAsync($"/api/reservations?{query}");
