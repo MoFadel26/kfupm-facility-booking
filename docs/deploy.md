@@ -26,8 +26,9 @@ GitHub Actions (deploy.yml) --Workload Identity Federation--> push image, update
 - `frontend/firebase.json` serves `frontend/dist` and sends every path to
   `index.html`, because the app routes in the browser.
 - Pending migrations are applied when the container starts
-  (`Database:MigrateOnStartup` defaults to true). That is safe because the
-  service is capped at one instance.
+  (`Database:MigrateOnStartup` defaults to true). EF Core locks
+  `__EFMigrationsHistory` before it migrates, so two instances that start
+  together apply them once.
 - The startup probe calls `/health/ready`, which answers 200 when the
   database answers. The liveness probe calls `/health/live`, which checks
   nothing, so a database outage does not restart the container over and over.
@@ -45,13 +46,17 @@ the console has.
 | Cloud SQL instance | `kfupm-facility-booking-db` | PostgreSQL 17, Enterprise edition, Sandbox preset, shared core (1 vCPU, 0.614 GB), 10 GB HDD, single zone, public IP with no authorized networks, no automated backups |
 | Database | `resource_manager` | |
 | Database user | `resourcemanager` | Built-in authentication, password of letters and digits only |
-| Secret | `db-connection` | `Host=/cloudsql/<project id>:me-central1:kfupm-facility-booking-db;Database=resource_manager;Username=resourcemanager;Password=<password>` |
+| Secret | `db-connection` | `Host=/cloudsql/<project id>:me-central1:kfupm-facility-booking-db;Database=resource_manager;Username=resourcemanager;Password=<password>;Maximum Pool Size=10` |
 | Secret | `jwt-signing-key` | Output of `openssl rand -base64 48` |
 | Runtime service account | `kfupm-api-runtime` | Roles: Cloud SQL Client, Secret Manager Secret Accessor |
 | Cloud Run service | `kfupm-facility-booking` | See below. Also in `deploy.yml` |
 | Deploy service account | `github-deployer` | Roles on the project: Artifact Registry Writer, Cloud Run Developer, Firebase Hosting Admin, Service Usage Viewer (the Firebase CLI checks that the Hosting API is on before it deploys). Service Account User on `kfupm-api-runtime` only |
 | Workload Identity pool | `github` | Provider `github-actions`, see below |
 | Firebase Hosting site | `<project id>` | Serves `https://<project id>.web.app` and `https://<project id>.firebaseapp.com` |
+
+`Maximum Pool Size=10` keeps the API under the database's connection limit:
+`db-f1-micro` allows about 25, and Npgsql would otherwise open up to 100
+per instance. Two instances use at most 20.
 
 The connection string has no `SSL Mode`. The Unix socket goes to the Cloud
 SQL Auth Proxy that Cloud Run runs next to the container, and the proxy
@@ -61,12 +66,18 @@ encrypts the connection to the instance.
 
 - Container image: the one the workflow pushed. Container port `8080`.
 - Ingress: All. Authentication: allow public access.
-- CPU 1, memory 512 MiB, CPU only during requests. Minimum instances 0,
-  maximum instances 1.
+- CPU 1, memory 512 MiB, CPU only during requests. Minimum instances 1,
+  maximum instances 2, set on the revision and on the service (the service
+  limit, `gcloud run services update --max=2`, caps every revision). One
+  instance is always running, so no visitor waits for a cold start. With a
+  maximum of 1, a burst that arrived while that one instance was starting
+  got 500s ("aborted after waiting too long for an available instance").
 - Security: service account `kfupm-api-runtime`.
 - Cloud SQL connections: `<project id>:me-central1:kfupm-facility-booking-db`.
-- Startup probe: HTTP `/health/ready`, port 8080, initial delay 10 s,
-  period 10 s, timeout 5 s, failure threshold 10.
+- Startup probe: HTTP `/health/ready`, port 8080, initial delay 0 s,
+  period 1 s, timeout 1 s, failure threshold 60. Cloud Run sends no request
+  to a new instance until this passes, so any delay here is added to every
+  cold start. A 10 s initial delay made the first request wait 10 s.
 - Liveness probe: HTTP `/health/live`, port 8080, period 10 s, timeout 5 s,
   failure threshold 3.
 
@@ -84,7 +95,7 @@ encrypts the connection to the instance.
 | `Database__SeedSampleData` | plain, optional | `true` seeds the sample facilities and users |
 | `ApiDocs__Enabled` | plain, optional | `true` serves the OpenAPI document and the Scalar docs |
 | `Bootstrap__AdminKfupmId` | plain, optional | The KFUPM id that registers as an admin. Without it, nobody can become an admin |
-| `RateLimiting__Auth__PermitLimit` | not set; default `5` | Login and register attempts per client address per minute |
+| `RateLimiting__Auth__PermitLimit` | not set; default `5` | Login and register attempts per client address per minute, counted per instance: with two instances running, a client can get up to 10 |
 | `Database__MigrateOnStartup` | not set; default `true` | |
 | `ASPNETCORE_HTTP_PORTS` | `Dockerfile` | `8080` |
 | `ASPNETCORE_ENVIRONMENT` | .NET image default | `Production` |
@@ -190,11 +201,14 @@ commit it runs on.
 
 ## Cost
 
-The free trial gives $300 for 90 days. Cloud SQL is the only part that
-charges from the first hour, about $10 a month for the settings above,
-whether or not anyone uses it; stopping the instance stops the compute
-charge. Cloud Run, Artifact Registry (0.5 GB), Secret Manager and Firebase
-Hosting stay inside their free monthly amounts at this traffic. When the
+The free trial gives $300 for 90 days. Two parts charge from the first
+hour, whether or not anyone uses them: Cloud SQL, about $10 a month for the
+settings above (stopping the instance stops the compute charge), and the
+one Cloud Run instance kept running, about $13.60 a month
+(1 vCPU and 0.5 GiB idle at $0.0000035 per second each in `me-central1`;
+`--min-instances=0 --min=0` removes it and brings cold starts back).
+Artifact Registry (0.5 GB), Secret Manager and Firebase Hosting stay inside
+their free monthly amounts at this traffic. When the
 trial ends, the resources stop until the account is upgraded to a paid one.
 
 ## Running the image locally
