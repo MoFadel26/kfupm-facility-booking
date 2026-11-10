@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { PlusIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -37,7 +38,8 @@ import {
 } from '@/api/participants'
 import { listAllReservations } from '@/api/reservations'
 import { listAllUsers } from '@/api/users'
-import { errorMessage } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
+import { returnTo, useAuth } from '@/auth/useAuth'
 import { humanize } from '@/lib/labels'
 import { PAGE_SIZE } from '@/types/api'
 import type {
@@ -49,6 +51,9 @@ import type {
 const ALL = 'all'
 
 export function ParticipantsPage() {
+  const { user, isAdmin } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [participants, setParticipants] = useState<EventParticipantResponse[] | null>(null)
   const [page, setPage] = useState(1)
   const [pageMeta, setPageMeta] = useState({ totalCount: 0, totalPages: 0 })
@@ -96,7 +101,29 @@ export function ParticipantsPage() {
     listAllReservations().then(setReservations).catch(() => setReservations([]))
   }, [])
 
+  /** A 401 means there is no session, or it ended: log in, then come back here. */
+  function showError(error: unknown) {
+    if (error instanceof ApiError && error.status === 401) {
+      toast.error('Log in to change participants.')
+      navigate('/login', { state: returnTo(location) })
+      return
+    }
+    toast.error(errorMessage(error))
+  }
+
+  /** The participant, the reservation's owner and admins may remove someone. */
+  function canRemove(participant: EventParticipantResponse) {
+    if (!user) return true // logged out, the action leads to /login
+    if (isAdmin || participant.userId === user.kfupmId) return true
+    const owner = reservations.find((r) => r.reservationId === participant.reservationId)?.userId
+    return owner === user.kfupmId
+  }
+
   function openCreate() {
+    if (!user) {
+      navigate('/login', { state: returnTo(location) })
+      return
+    }
     setFormUserId('')
     setFormReservationId(reservationFilter !== ALL ? reservationFilter : '')
     setFieldErrors({})
@@ -120,7 +147,7 @@ export function ParticipantsPage() {
       setDialogOpen(false)
       await load()
     } catch (error) {
-      toast.error(errorMessage(error))
+      showError(error)
     } finally {
       setSaving(false)
     }
@@ -132,7 +159,7 @@ export function ParticipantsPage() {
       toast.success(`Removed ${participant.userName} from the reservation.`)
       await load()
     } catch (error) {
-      toast.error(errorMessage(error))
+      showError(error)
     }
   }
 
@@ -227,10 +254,12 @@ export function ParticipantsPage() {
                       </p>
                     </TableCell>
                     <TableCell className="text-right">
-                      <ConfirmDelete
-                        description={`This removes ${p.userName} from reservation ${p.reservationId}.`}
-                        onConfirm={() => remove(p)}
-                      />
+                      {canRemove(p) && (
+                        <ConfirmDelete
+                          description={`This removes ${p.userName} from reservation ${p.reservationId}.`}
+                          onConfirm={() => remove(p)}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
