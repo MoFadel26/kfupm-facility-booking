@@ -16,10 +16,13 @@ WORKDIR /src
 # The project file alone first, so the restore layer is reused until a package
 # reference changes.
 COPY ResourceManager.Api/ResourceManager.Api.csproj ResourceManager.Api/
-RUN dotnet restore ResourceManager.Api/ResourceManager.Api.csproj -a $TARGETARCH
+# ReadyToRun compiles the assemblies ahead of time, so a cold start on Cloud Run
+# spends less time in the JIT. Restore needs it too, to fetch the compiler.
+RUN dotnet restore ResourceManager.Api/ResourceManager.Api.csproj -a $TARGETARCH \
+    -p:PublishReadyToRun=true
 COPY ResourceManager.Api/ ResourceManager.Api/
 RUN dotnet publish ResourceManager.Api/ResourceManager.Api.csproj -c Release -a $TARGETARCH \
-    --no-restore -o /app
+    -p:PublishReadyToRun=true --no-restore -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
