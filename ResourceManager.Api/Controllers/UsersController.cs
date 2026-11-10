@@ -17,17 +17,18 @@ public class UsersController : ControllerBase
         _userService = userService;
     }
 
+    /// <summary>Lists users. Emails are included only for an admin, or for the caller's own row.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<UserResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<UserResponse>>> GetAll([FromQuery] PageQuery query, CancellationToken ct)
-        => Ok(await _userService.GetAllAsync(query, ct));
+        => Ok(await _userService.GetAllAsync(query, User.FindKfupmId(), ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken ct)
-        => Ok(await _userService.GetByIdAsync(id, ct));
+        => Ok(await _userService.GetByIdAsync(id, User.FindKfupmId(), ct));
 
     [HttpPost]
     [Authorize(Policy = AdminRequirement.PolicyName)]

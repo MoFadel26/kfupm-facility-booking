@@ -15,4 +15,8 @@ public static class ClaimsPrincipalExtensions
     public static string GetKfupmId(this ClaimsPrincipal principal)
         => principal.FindFirstValue(JwtRegisteredClaimNames.Sub)
            ?? throw new ForbiddenException("The token does not name a user.");
+
+    /// <summary>The acting user's KfupmId, or null when the request has no valid token.</summary>
+    public static string? FindKfupmId(this ClaimsPrincipal principal)
+        => principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
 }

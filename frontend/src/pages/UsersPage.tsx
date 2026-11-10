@@ -110,7 +110,7 @@ export function UsersPage() {
     setForm({
       kfupmId: user.kfupmId,
       name: user.name,
-      email: user.email,
+      email: user.email ?? '',
       role: user.role,
       gender: user.gender,
       password: '',
@@ -159,7 +159,7 @@ export function UsersPage() {
       const q = searchQuery.toLowerCase()
       const matchesSearch =
         u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
+        (u.email ?? '').toLowerCase().includes(q) ||
         u.kfupmId.toLowerCase().includes(q)
       const matchesRole = roleFilter === 'ALL' || u.role === roleFilter
       return matchesSearch && matchesRole
@@ -239,7 +239,7 @@ export function UsersPage() {
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.kfupmId}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell className="text-muted-foreground">{user.email ?? '—'}</TableCell>
                     <TableCell>
                       <Badge className={`font-semibold ${ROLE_STYLES[user.role]}`}>
                         {humanize(user.role)}

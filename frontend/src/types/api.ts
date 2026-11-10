@@ -72,8 +72,10 @@ export interface CreateUserRequest extends UserRequest {
   password: string
 }
 
-export interface UserResponse extends UserRequest {
+export interface UserResponse extends Omit<UserRequest, 'email'> {
   id: string
+  /** Null unless the caller is an admin or this user. */
+  email: string | null
 }
 
 // ---------- Auth ----------

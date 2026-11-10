@@ -41,7 +41,13 @@ public class UserResponse
     public Guid Id { get; set; }
     public string KfupmId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Null on the public user endpoints unless the caller is an admin or this user, so
+    /// the list does not hand everyone's address to anyone who asks.
+    /// </summary>
+    public string? Email { get; set; }
+
     public UserRole Role { get; set; }
     public Gender Gender { get; set; }
 }

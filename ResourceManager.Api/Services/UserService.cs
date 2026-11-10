@@ -19,22 +19,38 @@ public class UserService : IUserService
         _passwordHasher = passwordHasher;
     }
 
-    public async Task<PagedResult<UserResponse>> GetAllAsync(PageQuery query, CancellationToken ct = default)
+    public async Task<PagedResult<UserResponse>> GetAllAsync(PageQuery query, string? actingUserId, CancellationToken ct = default)
     {
-        return await _db.Users.AsNoTracking()
+        var page = await _db.Users.AsNoTracking()
             .OrderBy(u => u.Name)
             .ThenBy(u => u.Id)
             .Select(UserMappingExtensions.Projection)
             .ToPagedResultAsync(query, ct);
+
+        await HideEmailsAsync(page.Items, actingUserId, ct);
+        return page;
     }
 
-    public async Task<UserResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<UserResponse> GetByIdAsync(Guid id, string? actingUserId, CancellationToken ct = default)
     {
-        return await _db.Users.AsNoTracking()
-            .Where(u => u.Id == id)
-            .Select(UserMappingExtensions.Projection)
-            .FirstOrDefaultAsync(ct)
-            ?? throw new NotFoundException(nameof(User), id);
+        var user = await _db.Users.AsNoTracking()
+                       .Where(u => u.Id == id)
+                       .Select(UserMappingExtensions.Projection)
+                       .FirstOrDefaultAsync(ct)
+                   ?? throw new NotFoundException(nameof(User), id);
+
+        await HideEmailsAsync([user], actingUserId, ct);
+        return user;
+    }
+
+    /// <summary>Admins see every email; anyone else sees only their own.</summary>
+    private async Task HideEmailsAsync(IEnumerable<UserResponse> users, string? actingUserId, CancellationToken ct)
+    {
+        if (actingUserId is not null && await IsAdminAsync(_db, actingUserId, ct))
+            return;
+
+        foreach (var user in users.Where(u => u.KfupmId != actingUserId))
+            user.Email = null;
     }
 
     /// <summary>
