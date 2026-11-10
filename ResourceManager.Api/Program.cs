@@ -168,11 +168,11 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 
-// Migrating on startup is convenient and fine for a single instance. Two instances
-// starting together will race, and a failed migration takes the app down with it rather
-// than failing a deploy step you can retry — so once this runs as more than one replica,
-// set Database:MigrateOnStartup to false and run `dotnet ef database update` from the
-// deployment pipeline instead.
+// Migrating on startup is convenient. Two instances starting together do not race: EF
+// Core locks __EFMigrationsHistory first, so one migrates and the other waits. A failed
+// migration still takes the app down with it rather than failing a deploy step you can
+// retry; if that starts to matter, set Database:MigrateOnStartup to false and run
+// `dotnet ef database update` from the deployment pipeline instead.
 if (builder.Configuration.GetValue("Database:MigrateOnStartup", true))
 {
     using var scope = app.Services.CreateScope();
